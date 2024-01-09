@@ -1,27 +1,28 @@
-use anyhow::anyhow;
-use itertools::Itertools;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use scad::{ScadElement, ScadObject};
-
-use self::{primitives::Face, spatial_index::Index};
+use self::primitives::{polygon::Polygon, Face, Line};
 
 pub(crate) mod bezier;
+pub(crate) mod bsp;
 pub(crate) mod hull;
+pub(crate) mod mesh;
 pub(crate) mod path;
 pub(crate) mod primitives;
-mod spatial_index;
+pub(crate) mod spatial_index;
+pub(crate) mod spatial_index_2d;
 pub(crate) mod stiching;
 pub(crate) mod surface;
 
 pub trait Geometry {
-    fn polygonize(&self) -> anyhow::Result<Vec<Face>>;
+    fn polygonize(&self) -> anyhow::Result<Vec<Polygon>>;
+}
+pub trait Geometry2D {
+    fn lines(&self) -> anyhow::Result<Vec<Line>>;
 }
 
 impl<T> Geometry for Vec<T>
 where
     T: Geometry,
 {
-    fn polygonize(&self) -> anyhow::Result<Vec<Face>> {
+    fn polygonize(&self) -> anyhow::Result<Vec<Polygon>> {
         Ok(self
             .iter()
             .filter_map(|item| item.polygonize().ok())
@@ -36,31 +37,24 @@ pub struct FaceCollection {
 }
 
 impl FaceCollection {
-    pub fn from_geometry(item: impl Geometry) -> anyhow::Result<Self> {
-        let fc = FaceCollection::default();
-        Ok(fc.update(item.polygonize()?))
-    }
-
-    pub fn update(mut self, mut faces: Vec<Face>) -> Self {
-        self.faces.append(&mut faces);
-        self
-    }
-
+    /*
     pub fn join(&mut self, geometry: impl Geometry) -> anyhow::Result<()> {
         self.faces.extend(geometry.polygonize()?);
         Ok(())
     }
     pub fn quantize(face: Face) -> Face {
-        let factor = 1e5;
+        let factor = 1e3;
         face.map(|v| (v * factor).map(|c| c.round()) / factor)
     }
+    */
 
+    /*
     pub fn make_scad(self) -> anyhow::Result<ScadObject> {
         let mut spatial_index = Index::allocate_default();
         let faces = self
             .faces
             .into_iter()
-            .map(Self::quantize)
+            // .map(Self::quantize)
             .collect::<Vec<_>>();
         for f in &faces {
             for p in f.iter() {
@@ -90,4 +84,76 @@ impl FaceCollection {
             faces,
         )))
     }
+    */
+}
+
+#[derive(Default)]
+pub struct LineCollection {
+    lines: Vec<Line>,
+}
+
+impl LineCollection {
+    pub fn join(&mut self, geometry: impl Geometry2D) -> anyhow::Result<()> {
+        self.lines.extend(geometry.lines()?);
+        Ok(())
+    }
+    /*
+    pub fn quantize(face: Line) -> Line {
+        let factor = 1e5;
+        face.map(|v| (v * factor).map(|c| c.round()) / factor)
+
+    }
+    */
+
+    /*
+    pub fn make_scad(self) -> anyhow::Result<ScadObject> {
+        let mut spatial_index = Index2d::allocate_default();
+        let faces = self
+            .lines
+            .into_iter()
+            //       .map(Self::quantize)
+            .collect::<Vec<_>>();
+        for f in &faces {
+            for p in f.iter() {
+                spatial_index.insert(*p, 0);
+            }
+        }
+        let spatial_index = spatial_index.rebalance();
+        let faces = faces
+            .into_par_iter()
+            .filter_map(|face| {
+                face.into_iter()
+                    .map(|point| {
+                        spatial_index
+                            .get_point_index(&point)
+                            //.map(|ix| ix as i32)
+                            .ok_or(anyhow!(
+                                "no such point in index - we lost it somehow {point}"
+                            ))
+                    })
+                    .try_collect::<_, Vec<usize>, _>()
+                    .and_then(|vec| {
+                        <LineIx as TryFrom<Vec<usize>>>::try_from(vec)
+                            .map_err(|e| anyhow!("Conversion to array failed"))
+                    })
+                    .ok()
+            })
+            .collect::<Vec<_>>();
+        let lines = faces
+            .into_iter()
+            .enumerate()
+            .flat_map(|(ix, line)| {
+                if ix == 0 {
+                    line.to_vec()
+                } else {
+                    vec![line[1]]
+                }
+            })
+            .collect();
+
+        Ok(ScadObject::new(ScadElement::Polygon(
+            PolygonParameters::new(spatial_index.linearize()).multi_vector_path(vec![lines]),
+        )))
+    }
+    */
 }

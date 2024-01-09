@@ -1,5 +1,11 @@
+use std::{fs::OpenOptions, path};
+
 use clap::Parser;
+use geometry::primitives::{Face, TriangleWrap};
+use nalgebra::Vector3;
 use scad::ScadFile;
+
+use crate::keyboard::bolt_builder::{Bolt, BoltBuilder, BoltPlace};
 
 mod cli;
 mod geometry;
@@ -9,25 +15,58 @@ mod utils;
 fn main() -> Result<(), anyhow::Error> {
     let cli = cli::Command::parse();
 
-    let mut scad_file = ScadFile::new();
-    scad_file.set_detail(50);
+    let m2_10 = Bolt {
+        nut: Some(keyboard::bolt_builder::Nut::hex_with_inner_diameter(4.0)),
+        diameter: 2.0,
+        height: 10.0,
+        head_diameter: 4.0,
+        head_height: 1.0,
+    };
+
+    let bb = BoltBuilder::new().add_bolt(BoltPlace {
+        position: Vector3::new(0.5, 35.0, 10.0),
+        bolt: m2_10,
+        nut_depth: 0.2,
+    });
+    // let mut scad_file = ScadFile::new();
+
     let keyboard = keyboard::KeyboardConfig::simple();
 
+    /*
     for button in keyboard.buttons() {
-        println!("--");
         scad_file.add_object(button.scad(2.0)?);
     }
 
-    //scad_file.add_object(keyboard.right_wall()?);
-    //scad_file.add_object(keyboard.top_wall()?);
-    //scad_file.add_object(keyboard.bottom_wall()?);
-    //scad_file.add_object(keyboard.thumb_bottom_wall()?);
-    //scad_file.add_object(keyboard.thumb_left_wall()?);
     scad_file.add_object(keyboard.thumb_right_to_main_left_2()?);
-    //scad_file.add_object(keyboard.thumb_top_wall()?);
-    scad_file.add_object(keyboard.build_total_wall()?);
 
-    println!("Done");
+
+    for s in keyboard
+        .between_buttons_in_columns()
+        .chain(keyboard.between_columns_main())
+        .chain(keyboard.between_columns_thumb())
+    {
+        scad_file.add_object(s);
+    }
+    */
+    // let base = keyboard.bottom_base()?;
+    let wall = keyboard.build_total_wall()?;
+    let mut writer = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(cli.output_path)?;
+
+    stl_io::write_stl(
+        &mut writer,
+        wall.into_iter().map(<Face as Into<TriangleWrap>>::into),
+    )?;
+
+    //let base_with_nuts = bb.with_nut(base);
+    //let wall = bb.with_head(wall);
+
+    // scad_file.add_object(base_with_nuts);
+    // scad_file.add_object(wall_with_bolts);
+    //scad_file.add_object(wall);
+    //println!("Done");
 
     /*
     //Create an scad object
@@ -46,7 +85,7 @@ fn main() -> Result<(), anyhow::Error> {
     */
 
     //Save the scad code to a file
-    scad_file.write_to_file(cli.output_path);
+    // scad_file.write_to_file(cli.output_path);
 
     Ok(())
 }

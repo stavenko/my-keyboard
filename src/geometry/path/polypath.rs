@@ -1,5 +1,13 @@
 use std::{rc::Rc, sync::Arc};
 
+use nalgebra::{Vector2, Vector3};
+use num_traits::{One, Zero};
+
+use crate::geometry::{
+    primitives::{decimal::Dec, origin::Origin, Segments},
+    Geometry2D,
+};
+
 use super::{bezier::BezierEdge, segment::EdgeSegment, Path};
 
 #[derive(Debug, Clone)]
@@ -41,8 +49,18 @@ impl PolyPath {
     pub fn join<T: Path + 'static>(&mut self, t: T) {
         self.parts.push(wrap(t))
     }
+    fn get_plane(&self) -> (Vector3<Dec>, Vector3<Dec>) {
+        let a = self.get_t(Dec::from(0.333));
+        let b = self.get_t(Dec::from(0.5));
+        let c = self.get_t(Dec::from(0.6667));
+        let u = a - b;
+        let v = a - c;
+        let c = a + b + c / Dec::from(3.0);
+        let n = u.cross(&v).normalize();
+        (c, n)
+    }
 
-    fn get_ix_t(&self, mut t: f32) -> (usize, f32) {
+    fn get_ix_t(&self, mut t: Dec) -> (usize, Dec) {
         let self_len = self.len();
         for (ix, item) in self.parts.iter().enumerate() {
             let l = item.len() / self_len;
@@ -52,12 +70,12 @@ impl PolyPath {
                 t -= l;
             }
         }
-        unreachable!("t is bigger that 1.0 ({t})- unreachable");
+        (self.parts.len() - 1, Dec::one())
     }
 }
 
 impl Path for PolyPath {
-    fn get_t(&self, t: f32) -> nalgebra::Vector3<f32> {
+    fn get_t(&self, t: Dec) -> Vector3<Dec> {
         let (ix, t) = self.get_ix_t(t);
         self.parts
             .get(ix)
@@ -65,11 +83,11 @@ impl Path for PolyPath {
             .get_t(t)
     }
 
-    fn len(&self) -> f32 {
+    fn len(&self) -> Dec {
         self.parts.iter().map(|p| p.len()).sum()
     }
 
-    fn get_tangent(&self, t: f32) -> nalgebra::UnitVector3<f32> {
+    fn get_tangent(&self, t: Dec) -> Vector3<Dec> {
         let (ix, t) = self.get_ix_t(t);
         self.parts
             .get(ix)
@@ -77,15 +95,15 @@ impl Path for PolyPath {
             .get_tangent(t)
     }
 
-    fn first(&self) -> nalgebra::Vector3<f32> {
-        self.get_t(0.0)
+    fn first(&self) -> nalgebra::Vector3<Dec> {
+        self.get_t(Dec::zero())
     }
 
-    fn last(&self) -> nalgebra::Vector3<f32> {
-        self.get_t(1.0)
+    fn last(&self) -> nalgebra::Vector3<Dec> {
+        self.get_t(Dec::one())
     }
 
-    fn get_edge_dir(&self, t: f32) -> nalgebra::Vector3<f32> {
+    fn get_edge_dir(&self, t: Dec) -> nalgebra::Vector3<Dec> {
         let (ix, t) = self.get_ix_t(t);
         self.parts
             .get(ix)
@@ -93,96 +111,20 @@ impl Path for PolyPath {
             .get_edge_dir(t)
     }
 }
-
-/*
-trait PathSpecificT<const N: usize>: Path {
-    fn path_specific_t(&self, t: f32) -> [Option<f32>; N];
-}
-
-impl<S, T> PathSpecificT<2> for PolyPath<(S, T)>
-where
-    S: Path,
-    T: Path,
-{
-    fn path_specific_t(&self, t: f32) -> [Option<f32>; 2] {
-        let len = self.len::<10>();
-        let f = self.0 .0.len::<10>() / len;
-        let l = 1.0 - f;
-        if t > f {
-            let rest_t = t - f;
-            let rest_t = rest_t / l;
-            [None, Some(rest_t)]
-        } else {
-            [Some(t / f), None]
-        }
+impl Geometry2D for PolyPath {
+    fn lines(&self) -> anyhow::Result<Vec<crate::geometry::primitives::Line>> {
+        Ok(self
+            .parts
+            .iter()
+            .flat_map(|part| {
+                Segments::new(part.segments_hint()).map(|(t, t1)| {
+                    let p1 = part.get_t(t);
+                    let p2 = part.get_t(t1);
+                    let p1 = Vector2::new(p1.x, p1.y);
+                    let p2 = Vector2::new(p2.x, p2.y);
+                    [p1, p2]
+                })
+            })
+            .collect::<Vec<_>>())
     }
 }
-impl<S, T, U> PathSpecificT<3> for PolyPath<(S, T, U)>
-where
-    S: Path,
-    T: Path,
-    U: Path,
-{
-    fn path_specific_t(&self, t: f32) -> [Option<f32>; 2] {
-        let len = self.len::<10>();
-        let a = self.0 .0.len::<10>() / len;
-        let b = self.0 .1.len::<10>() / len;
-        let c = 1.0 - a - b;
-        match (t > a && t <= b, t > b && t <= c) {
-            (true, false) => [Some(t / a), None, None],
-            (false, true) => [None, Some((t - a) / b), None],
-            (false, false) => [None, None, Some((t - a - b) / c)],
-            _ => unreachable!("Cannot be that"),
-        }
-        if t > a {
-        } else {
-            [Some(t / f), None]
-        }
-    }
-}
-impl<S, T> Path for PolyPath<(S, T)>
-where
-    S: Path,
-    T: Path,
-{
-    fn get_t(&self, t: f32) -> nalgebra::Vector3<f32> {
-        match self.path_specific_t(t) {
-            [Some(t), None] => self.0 .0.get_t(t),
-            [None, Some(t)] => self.0 .1.get_t(t),
-            _ => unreachable!("Incorrect combination"),
-        }
-    }
-
-    fn len<const D: usize>(&self) -> f32 {
-        self.0 .0.len::<D>() + self.0 .1.len::<D>()
-    }
-
-    fn get_tangent(&self, t: f32) -> nalgebra::UnitVector3<f32> {
-        match self.path_specific_t(t) {
-            [Some(t), None] => self.0 .0.get_tangent(t),
-            [None, Some(t)] => self.0 .1.get_tangent(t),
-            _ => unreachable!("Incorrect combination"),
-        }
-    }
-
-    fn first(&self) -> nalgebra::Vector3<f32> {
-        self.0 .0.first()
-    }
-
-    fn last(&self) -> nalgebra::Vector3<f32> {
-        self.0 .1.first()
-    }
-
-    fn inverse(self) -> Self {
-        todo!("inverse has problems during impl");
-    }
-
-    fn get_edge_dir(&self, t: f32) -> nalgebra::Vector3<f32> {
-        match self.path_specific_t(t) {
-            [Some(t), None] => self.0 .0.get_edge_dir(t),
-            [None, Some(t)] => self.0 .1.get_edge_dir(t),
-            _ => unreachable!("Incorrect combination"),
-        }
-    }
-}
-*/

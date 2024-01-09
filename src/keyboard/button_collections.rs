@@ -6,6 +6,7 @@ use crate::geometry::primitives::origin::Origin;
 
 use super::{button::Button, ButtonsColumn};
 
+#[derive(Debug)]
 pub struct ButtonsCollection {
     thickness: f32,
     pub origin: Origin,
@@ -64,10 +65,18 @@ impl ButtonsHull for ButtonsCollection {
             b
         }))
     }
+
+    fn columns(&self) -> impl Iterator<Item = ButtonsColumn> + '_ {
+        self.columns.iter().map(|c| {
+            let mut c = c.to_owned();
+            c.origin.add(&self.origin);
+            c
+        })
+    }
 }
 
 impl ButtonsCollection {
-    pub fn columns(mut self, columns: Vec<ButtonsColumn>) -> Self {
+    pub fn with_columns(mut self, columns: Vec<ButtonsColumn>) -> Self {
         self.columns = columns;
         self.last_column_ix = self.columns.len() - 1;
         self
@@ -94,6 +103,8 @@ impl ButtonsCollection {
 }
 
 pub trait ButtonsHull {
+    fn columns(&self) -> impl Iterator<Item = ButtonsColumn> + '_;
+
     fn buttons(&self) -> Box<dyn Iterator<Item = Button> + '_>;
     fn right_buttons(&self) -> Box<dyn Iterator<Item = Button> + '_>;
 

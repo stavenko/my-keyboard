@@ -1,38 +1,20 @@
-use std::{
-    collections::{HashMap, HashSet},
-    hash::{Hash, Hasher},
-};
+use nalgebra::Vector3;
+use num_traits::One;
 
-use anyhow::Ok;
-use itertools::{Either, Itertools};
-use nalgebra::{Vector, Vector3};
+use super::primitives::decimal::Dec;
 
 #[derive(Debug)]
 pub enum IndexContents {
     Empty,
     Quadrants([Box<Index>; 8]),
-    Single(Vector3<f32>),
-}
-
-#[derive(PartialEq, Debug)]
-pub struct VecWrap(Vector3<f32>);
-
-impl Eq for VecWrap {}
-
-impl Hash for VecWrap {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        let item = format!("{:.5} {:.5} {:.5}", self.0.x, self.0.y, self.0.z);
-
-        dbg!(&item);
-        item.hash(state);
-    }
+    Single(Vector3<Dec>),
 }
 
 impl IndexContents {}
 
 #[derive(Debug)]
 pub struct Index {
-    middle: Vector3<f32>,
+    middle: Vector3<Dec>,
     contents: IndexContents,
     points: usize,
 }
@@ -54,7 +36,7 @@ impl Index {
             points: 0,
         }
     }
-    fn single(v: Vector3<f32>) -> Self {
+    fn single(v: Vector3<Dec>) -> Self {
         Self {
             middle: v,
             contents: IndexContents::Single(v),
@@ -62,14 +44,14 @@ impl Index {
         }
     }
 
-    pub fn insert(&mut self, p: Vector3<f32>, deep: usize) {
+    pub fn insert(&mut self, p: Vector3<Dec>, deep: usize) {
         match &mut self.contents {
             IndexContents::Empty => {
                 self.contents = IndexContents::Single(p);
             }
             IndexContents::Single(v) => {
                 let diff = *v - p;
-                if diff.magnitude() > f32::EPSILON * 2.0 {
+                if diff.magnitude() > Dec::EPSILON {
                     let quadrants = Self::sort(vec![*v, p], &self.middle)
                         .map(|points| Box::new(Index::new(points)));
                     self.contents = IndexContents::Quadrants(quadrants);
@@ -101,14 +83,14 @@ impl Index {
         }
     }
 
-    pub fn get_vec(&self) -> Vec<Vector3<f32>> {
+    pub fn get_vec(&self) -> Vec<Vector3<Dec>> {
         match self.contents {
             IndexContents::Empty => Vec::new(),
             IndexContents::Single(v) => vec![v],
             IndexContents::Quadrants(ref qs) => qs.iter().flat_map(|q| q.get_vec()).collect(),
         }
     }
-    pub fn linearize(self) -> Vec<Vector3<f32>> {
+    pub fn linearize(self) -> Vec<Vector3<Dec>> {
         match self.contents {
             IndexContents::Empty => Vec::new(),
             IndexContents::Single(v) => vec![v],
@@ -124,23 +106,19 @@ impl Index {
         }
     }
 
-    pub fn get_point_index(&self, p: &Vector3<f32>) -> Option<usize> {
+    pub fn get_point_index(&self, p: &Vector3<Dec>) -> Option<usize> {
         match &self.contents {
-            IndexContents::Single(v) if (p - v).magnitude() < 1e-4 => Some(0),
+            IndexContents::Single(v) if (p - v).magnitude() < Dec::EPSILON => Some(0),
             IndexContents::Quadrants(qs) => {
                 let ix = Self::index(&self.middle, p);
                 let len_before: usize = qs.iter().take(ix).map(|q| q.get_length()).sum();
-                //dbg!(ix, self.middle);
                 qs[ix].get_point_index(p).map(|p| p + len_before)
             }
-            _ => {
-                // dbg!("@@@@", self.middle);
-                None
-            }
+            _ => None,
         }
     }
 
-    fn index(middle: &Vector3<f32>, p: &Vector3<f32>) -> usize {
+    fn index(middle: &Vector3<Dec>, p: &Vector3<Dec>) -> usize {
         #[allow(clippy::let_and_return)]
         let ix = if p.x > middle.x { 1 << 2 } else { 0 }
             + if p.y > middle.y { 1 << 1 } else { 0 }
@@ -148,9 +126,9 @@ impl Index {
         ix
     }
 
-    pub fn allocate(min: Vector3<f32>, max: Vector3<f32>) -> Self {
+    pub fn allocate(min: Vector3<Dec>, max: Vector3<Dec>) -> Self {
         Self {
-            middle: min.lerp(&max, 0.5),
+            middle: min.lerp(&max, Dec::from(0.5)),
             contents: IndexContents::Empty,
             points: 0,
         }
@@ -158,14 +136,14 @@ impl Index {
 
     pub fn allocate_default() -> Self {
         Self {
-            middle: Vector3::new(0.0, 0.0, 0.0),
+            middle: Vector3::zeros(),
             contents: IndexContents::Empty,
             points: 0,
         }
     }
 
-    fn sort(points: Vec<Vector3<f32>>, middle: &Vector3<f32>) -> [Vec<Vector3<f32>>; 8] {
-        let mut ars: [Vec<Vector3<f32>>; 8] = Default::default();
+    fn sort(points: Vec<Vector3<Dec>>, middle: &Vector3<Dec>) -> [Vec<Vector3<Dec>>; 8] {
+        let mut ars: [Vec<Vector3<Dec>>; 8] = Default::default();
 
         for p in points {
             let ix = Self::index(middle, &p);
@@ -174,9 +152,9 @@ impl Index {
         ars
     }
 
-    pub fn new(mut points: Vec<Vector3<f32>>) -> Self {
-        let sum: Vector3<f32> = points.iter().sum();
-        let avg = sum / points.len() as f32;
+    pub fn new(mut points: Vec<Vector3<Dec>>) -> Self {
+        let sum: Vector3<Dec> = points.iter().sum();
+        let avg: Vector3<Dec> = sum / Dec::from(points.len());
 
         let b = points.len();
         let _c = points.clone();
@@ -190,26 +168,6 @@ impl Index {
                 }
             }
         }
-
-        // dbg!(&points);
-        /*
-        if points.len() == 2 && points.iter().filter(|p| *p == avg) {
-            let d = points.get(0).unwrap() - points.get(1).unwrap();
-            dbg!(d.magnitude(), f32::EPSILON);
-            dbg!(d.magnitude() < f32::EPSILON);
-            dbg!(avg, &points);
-        }
-        let points = points
-            .into_iter()
-            .fold(HashMap::new(), |mut hm, item| {
-                let key = format!("{:.5} {:.5} {:.5}", item.x, item.y, item.z);
-                hm.insert(key, item);
-                hm
-            })
-            .into_iter()
-            .map(|v| v.1)
-            .collect_vec();
-        */
 
         if points.is_empty() {
             Index::empty()
@@ -234,23 +192,23 @@ mod test {
 
     use assert_matches::assert_matches;
     use nalgebra::Vector3;
+    use num_traits::Zero;
 
-    use crate::geometry::spatial_index::Index;
+    use crate::geometry::{primitives::decimal::Dec, spatial_index::Index};
 
     use super::IndexContents;
 
     #[test]
     fn ix_is_correct() {
         let items = vec![
-            Vector3::new(1.0, 1.0, 1.0),
-            Vector3::new(1.0, 1.0, 0.0),
-            Vector3::new(1.0, 0.0, 1.0),
-            Vector3::new(0.0, -10.0, 0.0),
-            Vector3::new(1.0, 0.0, 0.0),
-            Vector3::new(10.0, 0.0, 0.0),
-            Vector3::new(0.0, 1.0, 1.0),
-            Vector3::new(0.0, 1.0, 0.0),
-            Vector3::new(0.0, 0.0, 1.0),
+            Vector3::new(Dec::from(1.0), Dec::from(1.0), Dec::from(1.0)),
+            Vector3::new(Dec::from(1.0), Dec::from(1.0), Dec::from(0.0)),
+            Vector3::new(Dec::from(1.0), Dec::from(0.0), Dec::from(1.0)),
+            Vector3::new(Dec::from(1.0), Dec::from(0.0), Dec::from(0.0)),
+            Vector3::new(Dec::from(0.0), Dec::from(1.0), Dec::from(1.0)),
+            Vector3::new(Dec::from(0.0), Dec::from(1.0), Dec::from(0.0)),
+            Vector3::new(Dec::from(0.0), Dec::from(0.0), Dec::from(1.0)),
+            Vector3::new(Dec::from(0.0), Dec::from(0.0), Dec::from(0.0)),
         ];
         let ix = Index::new(items.clone());
         let t = items
@@ -263,7 +221,7 @@ mod test {
             .iter()
             .map(|point| {
                 arr.iter()
-                    .position(|v| (v - point).magnitude() < f32::EPSILON)
+                    .position(|v| (v - point).magnitude() < Dec::EPSILON)
                     .unwrap()
             })
             .collect::<Vec<_>>();
@@ -272,18 +230,18 @@ mod test {
     #[test]
     fn balance_is_ok() {
         let items = vec![
-            Vector3::new(1.0, 1.0, 1.0),
-            Vector3::new(1.0, 1.0, 0.0),
-            Vector3::new(1.0, 0.0, 1.0),
-            Vector3::new(1.0, 0.0, 0.0),
-            Vector3::new(0.0, 1.0, 1.0),
-            Vector3::new(0.0, 1.0, 0.0),
-            Vector3::new(0.0, 0.0, 1.0),
-            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(Dec::from(1.0), Dec::from(1.0), Dec::from(1.0)),
+            Vector3::new(Dec::from(1.0), Dec::from(1.0), Dec::from(0.0)),
+            Vector3::new(Dec::from(1.0), Dec::from(0.0), Dec::from(1.0)),
+            Vector3::new(Dec::from(1.0), Dec::from(0.0), Dec::from(0.0)),
+            Vector3::new(Dec::from(0.0), Dec::from(1.0), Dec::from(1.0)),
+            Vector3::new(Dec::from(0.0), Dec::from(1.0), Dec::from(0.0)),
+            Vector3::new(Dec::from(0.0), Dec::from(0.0), Dec::from(1.0)),
+            Vector3::new(Dec::from(0.0), Dec::from(0.0), Dec::from(0.0)),
         ];
         let mut ix = Index::allocate(
-            Vector3::new(-500., -500., -500.),
-            Vector3::new(-499., -499., -499.),
+            Vector3::new(Dec::from(-500), Dec::from(-500), Dec::from(-500)),
+            Vector3::new(Dec::from(-499), Dec::from(-499), Dec::from(-499)),
         );
         for t in &items {
             ix.insert(*t, 0);

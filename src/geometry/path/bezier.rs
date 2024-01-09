@@ -1,14 +1,19 @@
 use nalgebra::{UnitVector3, Vector3};
+use rust_decimal::prelude::One;
 
-use crate::geometry::{path::Path, primitives::Segments};
+use crate::geometry::{
+    path::Path,
+    primitives::{decimal::Dec, Segments},
+};
 
 use super::PathInverse;
+use num_traits::Pow;
 
 #[derive(Clone, Debug)]
 pub struct BezierEdge {
-    pub base: [Vector3<f32>; 4],
-    edge_force: [Vector3<f32>; 4],
-    len_cache: Option<f32>,
+    pub base: [Vector3<Dec>; 4],
+    edge_force: [Vector3<Dec>; 4],
+    len_cache: Option<Dec>,
     quality: usize,
 }
 
@@ -29,7 +34,7 @@ impl PathInverse for BezierEdge {
 }
 
 impl BezierEdge {
-    pub fn new(base: [Vector3<f32>; 4], edge_force: [Vector3<f32>; 4]) -> Self {
+    pub fn new(base: [Vector3<Dec>; 4], edge_force: [Vector3<Dec>; 4]) -> Self {
         let mut b = BezierEdge {
             base,
             edge_force,
@@ -41,7 +46,7 @@ impl BezierEdge {
         b
     }
 
-    pub fn new_simple(base: [Vector3<f32>; 4]) -> Self {
+    pub fn new_simple(base: [Vector3<Dec>; 4]) -> Self {
         let zeros = Vector3::zeros();
         let mut b = BezierEdge {
             base,
@@ -55,13 +60,13 @@ impl BezierEdge {
 }
 
 impl Path for BezierEdge {
-    fn get_edge_dir(&self, t: f32) -> Vector3<f32> {
-        let ot = 1.0 - t;
+    fn get_edge_dir(&self, t: Dec) -> Vector3<Dec> {
+        let ot = Dec::one() - t;
         let weights = [
-            ot.powi(3),
-            3. * ot.powi(2) * t,
-            3. * ot * t.powi(2),
-            t.powi(3),
+            ot.pow(3i64),
+            Dec::from(3) * ot.pow(2i64) * t,
+            Dec::from(3) * ot * t.pow(2i64),
+            t.pow(3i64),
         ];
 
         self.edge_force
@@ -70,42 +75,41 @@ impl Path for BezierEdge {
             .map(|(v, w)| v * w)
             .sum()
     }
-    fn get_t(&self, t: f32) -> Vector3<f32> {
-        let ot = 1.0 - t;
+    fn get_t(&self, t: Dec) -> Vector3<Dec> {
+        let ot = Dec::one() - t;
         let weights = [
-            ot.powi(3),
-            3. * ot.powi(2) * t,
-            3. * ot * t.powi(2),
-            t.powi(3),
+            ot.pow(3i64),
+            Dec::from(3) * ot.pow(2i64) * t,
+            Dec::from(3) * ot * t.pow(2i64),
+            t.pow(3i64),
         ];
 
         self.base.into_iter().zip(weights).map(|(v, w)| v * w).sum()
     }
 
-    fn len(&self) -> f32 {
+    fn len(&self) -> Dec {
         if let Some(l) = self.len_cache {
             l
         } else {
-            let l = Segments::new(40)
+            Segments::new(40)
                 .map(|(f, l)| self.get_t(f) - self.get_t(l))
                 .map(|line| line.magnitude())
-                .sum();
-            l
+                .sum()
         }
     }
 
-    fn get_tangent(&self, t: f32) -> nalgebra::UnitVector3<f32> {
-        let dt = 0.001; // TODO something with t == 1.0
+    fn get_tangent(&self, t: Dec) -> Vector3<Dec> {
+        let dt = Dec::from(0.0001); // TODO something with t == 1.0
         let t1 = t + dt;
         let v = self.get_t(t1) - self.get_t(t);
-        UnitVector3::new_normalize(v)
+        v.normalize()
     }
 
-    fn first(&self) -> Vector3<f32> {
+    fn first(&self) -> Vector3<Dec> {
         self.base[0]
     }
 
-    fn last(&self) -> Vector3<f32> {
+    fn last(&self) -> Vector3<Dec> {
         self.base[3]
     }
 }

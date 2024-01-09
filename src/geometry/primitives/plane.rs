@@ -1,119 +1,221 @@
-use nalgebra::{Rotation3, Vector3};
-use scad::{Polyhedron, ScadObject};
+use itertools::{Itertools, PutBack};
+use nalgebra::{ComplexField, Vector3};
+use num_traits::{One, Zero};
+use rust_decimal_macros::dec;
 
-#[derive(Clone)]
+use super::{
+    decimal::Dec,
+    polygon::{self, Polygon},
+    Face,
+};
+
+#[derive(Clone, Debug)]
 pub struct Plane {
-    origin: Vector3<f32>,
-    normal: Vector3<f32>,
-    dir: Vector3<f32>,
+    pub origin: Vector3<Dec>,
+    pub normal: Vector3<Dec>,
+}
+#[derive(Default, Debug)]
+pub struct SplitResult {
+    pub front: Vec<Polygon>,
+    pub back: Vec<Polygon>,
+    pub coplanar_back: Vec<Polygon>,
+    pub coplanar_front: Vec<Polygon>,
+}
+
+impl SplitResult {
+    fn front(mut self, face: Polygon) -> Self {
+        self.front.push(face);
+        self
+    }
+    fn back(mut self, face: Polygon) -> Self {
+        self.back.push(face);
+        self
+    }
+    fn coplanar_back(mut self, face: Polygon) -> Self {
+        self.coplanar_back.push(face);
+        self
+    }
+    fn coplanar_front(mut self, face: Polygon) -> Self {
+        self.coplanar_front.push(face);
+        self
+    }
+}
+
+#[derive(PartialEq)]
+enum Location {
+    Front,
+    Back,
+    Coplanar,
 }
 
 impl Plane {
-    fn offset_normal(mut self, diff: f32) -> Self {
-        self.origin += self.normal * diff;
+    fn split(&self, polygon: &Polygon) -> (Polygon, Polygon) {
+        let mut front = Vec::new();
+        let mut back = Vec::new();
+        let len = polygon.vertices.len();
+        for (i, current) in polygon.vertices.iter().enumerate() {
+            let j = (i + 1) % len;
+            let next = polygon.vertices[j];
+            let location_current = self.location(current);
+            let location_next = self.location(&next);
+            match location_current {
+                Location::Back => {
+                    back.push(*current);
+                }
+                Location::Front => {
+                    front.push(*current);
+                }
+                Location::Coplanar => {
+                    front.push(*current);
+                    back.push(*current);
+                }
+            }
+            match (location_next, location_current) {
+                (Location::Front, Location::Back) => {
+                    let d = (next - self.origin).dot(&self.normal);
+                    let t = d / (next - current).dot(&self.normal);
+                    assert!(t > Dec::zero());
+                    let u = next.lerp(current, t);
+                    front.push(u);
+                    back.push(u);
+                }
+                (Location::Back, Location::Front) => {
+                    let d = (current - self.origin).dot(&self.normal);
+                    let t = d / (current - next).dot(&self.normal);
+                    assert!(t > Dec::zero());
+                    let u = current.lerp(&next, t);
+                    front.push(u);
+                    back.push(u);
+                }
+                _ => {}
+            }
+        }
+        (
+            Polygon::new_with_normal(front, polygon.get_normal()),
+            Polygon::new_with_normal(back, polygon.get_normal()),
+        )
+    }
+    fn split_fbb(
+        f: Vector3<Dec>,
+        b1: Vector3<Dec>,
+        b2: Vector3<Dec>,
+        normal: Vector3<Dec>,
+        o: Vector3<Dec>,
+        n: Vector3<Dec>,
+    ) -> (Face, [Face; 2]) {
+        let d = (f - o).dot(&n);
+
+        let t = d / (f - b1).dot(&n);
+        let u = f.lerp(&b1, t);
+        let s = d / (f - b2).dot(&n);
+        let v = f.lerp(&b2, s);
+        if t < Dec::zero() || s < Dec::zero() || s > Dec::one() || t > Dec::one() {
+            dbg!(t);
+            panic!("out of t {t} or s {s}");
+        }
+
+        (
+            Face::new_with_normal([f, u, v], normal),
+            [
+                Face::new_with_normal([u, b1, b2], normal),
+                Face::new_with_normal([u, b2, v], normal),
+            ],
+        )
+    }
+
+    fn split_fcb(
+        f: Vector3<Dec>,
+        c: Vector3<Dec>,
+        b: Vector3<Dec>,
+        normal: Vector3<Dec>,
+        o: Vector3<Dec>,
+        n: Vector3<Dec>,
+    ) -> (Face, Face) {
+        let d = (f - o).dot(&n);
+
+        let t = d / (f - b).dot(&n);
+
+        if t < Dec::zero() || t > Dec::one() {
+            panic!("out of t {t}");
+        }
+        let u = f.lerp(&b, t);
+        (
+            Face::new_with_normal([f, c, u], normal),
+            Face::new_with_normal([c, b, u], normal),
+        )
+    }
+
+    fn split_bcf(
+        b: Vector3<Dec>,
+        c: Vector3<Dec>,
+        f: Vector3<Dec>,
+        normal: Vector3<Dec>,
+        o: Vector3<Dec>,
+        n: Vector3<Dec>,
+    ) -> (Face, Face) {
+        let d = (f - o).dot(&n);
+
+        let t = d / (f - b).dot(&n);
+        if t < Dec::zero() || t > Dec::one() {
+            panic!("out of t {t}");
+        }
+        let u = f.lerp(&b, t);
+        (
+            Face::new_with_normal([b, c, u], normal),
+            Face::new_with_normal([c, f, u], normal),
+        )
+    }
+
+    fn location(&self, v: &Vector3<Dec>) -> Location {
+        let eps: Dec = dec!(1e-9).into();
+        let i = (v - self.origin).dot(&self.normal);
+        if i < -eps {
+            Location::Back
+        } else if i > eps {
+            Location::Front
+        } else {
+            Location::Coplanar
+        }
+    }
+    pub fn split_polygon(&self, face: Polygon) -> SplitResult {
+        let eps: Dec = dec!(1e-9).into();
+        let locations = face
+            .vertices
+            .iter()
+            .map(|v| (v - self.origin).dot(&self.normal))
+            .map(|i| {
+                if i < -eps {
+                    Location::Back
+                } else if i > eps {
+                    Location::Front
+                } else {
+                    Location::Coplanar
+                }
+            })
+            .collect_vec();
+
+        let has_back = locations.iter().any(|f| *f == Location::Back);
+        let has_front = locations.iter().any(|f| *f == Location::Front);
+        match (has_back, has_front) {
+            (true, true) => {
+                let (fronts, backs) = self.split(&face);
+                SplitResult::default().front(fronts).back(backs)
+            }
+            (false, true) => SplitResult::default().front(face),
+            (true, false) => SplitResult::default().back(face),
+            (false, false) => {
+                let n = face.get_normal();
+                if self.normal.dot(&n) > Dec::zero() {
+                    SplitResult::default().coplanar_front(face)
+                } else {
+                    SplitResult::default().coplanar_back(face)
+                }
+            }
+        }
+    }
+
+    pub(crate) fn flip(mut self) -> Plane {
+        self.normal = -self.normal;
         self
-    }
-    fn xy0() -> Self {
-        Self {
-            origin: Vector3::<f32>::new(0.0, 0.0, 0.0),
-            normal: Vector3::<f32>::new(0.0, 0.0, 1.0),
-            dir: Vector3::<f32>::new(0.0, 1.0, 0.0),
-        }
-    }
-    fn yz0() -> Self {
-        Self {
-            origin: Vector3::<f32>::new(0.0, 0.0, 0.0),
-            normal: Vector3::<f32>::new(1.0, 0.0, 0.0),
-            dir: Vector3::<f32>::new(0.0, 1.0, 0.0),
-        }
-    }
-    fn xz0() -> Self {
-        Self {
-            origin: Vector3::<f32>::new(0.0, 0.0, 0.0),
-            normal: Vector3::<f32>::new(0.0, 1.0, 0.0),
-            dir: Vector3::<f32>::new(1.0, 0.0, 0.0),
-        }
-    }
-    fn xy(origin: Vector3<f32>) -> Self {
-        Self {
-            origin,
-            normal: Vector3::<f32>::new(0.0, 0.0, 1.0),
-            dir: Vector3::<f32>::new(0.0, 1.0, 0.0),
-        }
-    }
-    fn xz(origin: Vector3<f32>) -> Self {
-        Self {
-            origin,
-            normal: Vector3::<f32>::new(0.0, 1.0, 0.0),
-            dir: Vector3::<f32>::new(1.0, 0.0, 0.0),
-        }
-    }
-    fn yz(origin: Vector3<f32>) -> Self {
-        Self {
-            origin,
-            normal: Vector3::<f32>::new(1.0, 0.0, 0.0),
-            dir: Vector3::<f32>::new(0.0, 1.0, 0.0),
-        }
-    }
-
-    fn rotate(mut self, axis: Vector3<f32>, angle: f32) -> Self {
-        let rotation = Rotation3::new(axis * angle);
-        self.normal = rotation * self.normal;
-        self.dir = rotation * self.dir;
-        self
-    }
-
-    fn create_simple_box(&self, width: f32, height: f32, depth: f32) -> anyhow::Result<ScadObject> {
-        let y_dir = self.dir;
-        let x_dir = self.normal.cross(&self.dir);
-        let z_dir = self.normal;
-        if x_dir.magnitude() < f32::EPSILON {
-            Err(anyhow::Error::msg("Button orientation conflict, row direction and plane normal are collinear. Cannot calculate corrent `left-right` orientation"))?;
-        }
-
-        let dx = x_dir * width / 2.;
-        let dy = y_dir * height / 2.;
-        let dz = z_dir * depth / 2.;
-        let o = self.origin;
-
-        let points = vec![
-            -dx + dy + dz,
-            dx + dy + dz,
-            dx - dy + dz,
-            -dx - dy + dz,
-            -dx + dy - dz,
-            dx + dy - dz,
-            dx - dy - dz,
-            -dx - dy - dz,
-        ]
-        .into_iter()
-        .map(|p| p + o)
-        .collect();
-
-        let faces = vec![
-            //  1
-            vec![0, 1, 2, 3],
-            //  2
-            vec![1, 0, 4, 5],
-            //  3
-            vec![7, 6, 5, 4],
-            //  4
-            vec![3, 2, 6, 7],
-            //  5
-            vec![0, 3, 7, 4],
-            //  6
-            vec![2, 1, 5, 6],
-        ];
-
-        let polyhedron = Polyhedron(points, faces);
-        Ok(ScadObject::new(polyhedron))
-    }
-
-    fn right(&self) -> Vector3<f32> {
-        self.normal.cross(&self.dir)
-    }
-
-    fn left(&self) -> Vector3<f32> {
-        -self.right()
     }
 }

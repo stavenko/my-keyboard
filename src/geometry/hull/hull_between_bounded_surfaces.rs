@@ -1,13 +1,15 @@
 use std::marker::PhantomData;
 
 use crate::geometry::{
-    primitives::Face,
+    primitives::polygon::Polygon,
     surface::{
         topology::{Four, Three, Topology},
         GetBoundingPath, Surface, SurfaceBetweenTwoPaths,
     },
     Geometry,
 };
+
+use super::Hull;
 
 /// Generic hull between two surfaces.
 /// Expected, that surfaces have following properties:
@@ -39,16 +41,19 @@ where
     A: GetBoundingPath<3>,
     B: GetBoundingPath<3>,
 {
-    pub fn polygonize_sides(&self) -> anyhow::Result<Vec<Face>> {
+    pub fn polygonize_sides(&self) -> anyhow::Result<[Vec<Polygon>; 4]> {
         Ok([
             Geometry::polygonize(&self.get_side_surface_0())?,
-            Geometry::polygonize(&self.get_side_surface_1())?,
-            Geometry::polygonize(&self.get_side_surface_2())?,
+            Geometry::polygonize(&self.get_side_surface_1())?
+                .into_iter()
+                .map(|f| f.flip())
+                .collect(),
+            Geometry::polygonize(&self.get_side_surface_2())?
+                .into_iter()
+                .map(|f| f.flip())
+                .collect(),
             Geometry::polygonize(&self.get_side_surface_3())?,
-        ]
-        .into_iter()
-        .flatten()
-        .collect())
+        ])
     }
 }
 
@@ -63,15 +68,18 @@ where
     A: GetBoundingPath<2>,
     B: GetBoundingPath<2>,
 {
-    pub fn polygonize_sides(&self) -> anyhow::Result<Vec<Face>> {
+    pub fn polygonize_sides(&self) -> anyhow::Result<[Vec<Polygon>; 3]> {
         Ok([
-            Geometry::polygonize(&self.get_side_surface_0())?,
+            Geometry::polygonize(&self.get_side_surface_0())?
+                .into_iter()
+                .map(|f| f.flip())
+                .collect(),
             Geometry::polygonize(&self.get_side_surface_1())?,
-            Geometry::polygonize(&self.get_side_surface_2())?,
-        ]
-        .into_iter()
-        .flatten()
-        .collect())
+            Geometry::polygonize(&self.get_side_surface_2())?
+                .into_iter()
+                .map(|f| f.flip())
+                .collect(),
+        ])
     }
 }
 
@@ -162,18 +170,22 @@ where
     B: GetBoundingPath<1>,
     B: GetBoundingPath<2>,
 {
-    fn polygonize(&self) -> anyhow::Result<Vec<crate::geometry::primitives::Face>> {
+    fn polygonize(&self) -> anyhow::Result<Vec<Polygon>> {
         let upper = Geometry::polygonize(&self.upper)?;
-        let lower = Geometry::polygonize(&self.lower)?;
+        let lower = Geometry::polygonize(&self.lower)?
+            .into_iter()
+            .map(|f| f.flip())
+            .collect();
         let sides = self.polygonize_sides()?;
 
-        Ok([upper, lower] //, right, left, top, bottom]
+        Ok([[upper, lower].as_slice(), &sides]
+            .concat() //, right, left, top, bottom]
             .into_iter()
             .flatten()
-            .chain(sides)
             .collect())
     }
 }
+
 impl<A, B> Geometry for HullBetweenSurfaces<Four, A, B>
 where
     A: Surface<Four>,
@@ -189,15 +201,16 @@ where
     B: GetBoundingPath<2>,
     B: GetBoundingPath<3>,
 {
-    fn polygonize(&self) -> anyhow::Result<Vec<crate::geometry::primitives::Face>> {
+    fn polygonize(&self) -> anyhow::Result<Vec<Polygon>> {
         let upper = Geometry::polygonize(&self.upper)?;
         let lower = Geometry::polygonize(&self.lower)?;
-        let sides = self.polygonize_sides()?;
+        let upper = upper.into_iter().map(|f| f.flip()).collect();
+        let [top, bottom, right, left] = self.polygonize_sides()?;
 
-        Ok([upper, lower] //, right, left, top, bottom]
+        Ok([[upper, lower].as_slice(), &[top, bottom, left, right]]
+            .concat() // right, left, top, bottom]
             .into_iter()
             .flatten()
-            .chain(sides)
             .collect())
     }
 }

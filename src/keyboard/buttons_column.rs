@@ -2,6 +2,7 @@ use crate::geometry::primitives::origin::Origin;
 
 use super::button::Button;
 
+#[derive(Clone, Debug)]
 pub(crate) struct ButtonsColumn {
     buttons: Vec<Button>,
     top_button_ix: usize,
