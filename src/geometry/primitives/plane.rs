@@ -91,8 +91,8 @@ impl Plane {
             }
         }
         (
-            Polygon::new_with_normal(front, polygon.get_normal()),
-            Polygon::new_with_normal(back, polygon.get_normal()),
+            Polygon::new_with_basis(front, polygon.get_basis_2d()),
+            Polygon::new_with_basis(back, polygon.get_basis_2d()),
         )
     }
     fn split_fbb(

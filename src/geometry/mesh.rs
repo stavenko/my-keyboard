@@ -1,75 +1,75 @@
 use core::fmt;
 
 use anyhow::anyhow;
+use itertools::{Either, Itertools};
+use stl_io::Triangle;
 
 use super::{
-    bsp::Bsp,
+    bsp::bsp3::Bsp3,
     hull::Hull,
-    primitives::{polygon::Polygon, Face},
+    primitives::polygon::{Basis2d, Polygon},
     surface::topology::Topology,
-    Geometry,
 };
 
-pub struct Mesh(Bsp);
-// pub struct SimpleMesh(Vec<Face>);
-
-/*
-impl IntoIterator for SimpleMesh {
-    type Item = Face;
-
-    type IntoIter = <Vec<Face> as IntoIterator>::IntoIter;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+pub struct Side {
+    basis: Basis2d,
+    polygons: Vec<Polygon>,
+}
+impl Side {
+    fn triangles(&self) -> Vec<Triangle> {
+        todo!()
     }
 }
 
-impl SimpleMesh {
-    pub(crate) fn join(self, mm: SimpleMesh) -> SimpleMesh {
-        self
-    }
+pub struct Mesh {
+    sides: Vec<Side>,
 }
-*/
 
 impl Mesh {
-    pub(crate) fn join(self, b: Mesh) -> Mesh {
-        dbg!("join");
-        let mut a = self.0.clip_by(&b.0);
-        let b = b.0.clip_by(&a);
-        let b = b.invert();
-        let b = b.clip_by(&a);
-        let b = b.invert();
-        a.merge(b);
-        Self(a)
-        //self
+    pub fn boolean_union(self, other: Self) -> Either<Self, (Self, Self)> {
+        todo!("implement boolean_union")
+    }
+    pub fn boolean_diff(self, other: Self) -> Option<Self> {
+        todo!("implement boolean_diff")
+    }
+    pub fn boolean_intersecion(self, other: Self) -> Option<Self> {
+        todo!("implement boolean_intersecion")
     }
 }
+
 pub struct TriIter {
-    inner: Box<dyn Iterator<Item = Face>>,
+    inner: <Vec<Triangle> as IntoIterator>::IntoIter,
     size: usize,
 }
+
 impl ExactSizeIterator for TriIter {}
 
 impl Iterator for TriIter {
-    type Item = Face;
+    type Item = Triangle;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
+
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.size, Some(self.size))
     }
 }
 
 impl IntoIterator for Mesh {
-    type Item = Face;
+    type Item = Triangle;
 
     type IntoIter = TriIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        let size = self.0.calculate_triangles();
+        let triangles = self
+            .sides
+            .into_iter()
+            .flat_map(|side| side.triangles())
+            .collect_vec();
+        let size = triangles.len();
         TriIter {
-            inner: Box::new(self.0.into_iter().flat_map(|p| p.triangles())),
+            inner: triangles.into_iter(),
             size,
         }
     }
@@ -90,9 +90,10 @@ where
             .chain(value.inner);
 
         dbg!("buildmesh");
-        let bsp = Bsp::build(faces).ok_or(anyhow!("failed to build bsp tree"))?;
+        let bsp = Bsp3::build(faces).ok_or(anyhow!("failed to build bsp tree"))?;
         dbg!("ok convert to mesh");
+        todo!("mesh creation");
 
-        Ok(Self(bsp))
+        //  Ok(Self(bsp))
     }
 }

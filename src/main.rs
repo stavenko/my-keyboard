@@ -55,10 +55,7 @@ fn main() -> Result<(), anyhow::Error> {
         .truncate(true)
         .open(cli.output_path)?;
 
-    stl_io::write_stl(
-        &mut writer,
-        wall.into_iter().map(<Face as Into<TriangleWrap>>::into),
-    )?;
+    stl_io::write_stl(&mut writer, wall.into_iter())?;
 
     //let base_with_nuts = bb.with_nut(base);
     //let wall = bb.with_head(wall);

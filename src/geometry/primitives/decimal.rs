@@ -12,10 +12,13 @@ use rust_decimal::{
     prelude::{One, Zero},
     Decimal, MathematicalOps,
 };
+use rust_decimal_macros::dec;
 use simba::scalar::{SubsetOf, SupersetOf};
 
-#[derive(PartialEq, PartialOrd, Eq, Hash, Debug, Clone, Copy)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Clone, Copy)]
 pub struct Dec(Decimal);
+
+pub const EPS: Dec = Dec(dec!(1e-8));
 
 impl SubsetOf<Dec> for Dec {
     fn to_superset(&self) -> Dec {
@@ -144,7 +147,8 @@ impl ComplexField for Dec {
     }
 
     fn acos(self) -> Self {
-        todo!()
+        let inner: f64 = self.into();
+        Self(Decimal::from_f64(inner.acos()).expect("conversion must be ok"))
     }
 
     fn atan(self) -> Self {
@@ -463,9 +467,9 @@ impl SupersetOf<f64> for Dec {
 }
 
 impl Sum for Dec {
-    fn sum<I: Iterator<Item = Self>>(mut iter: I) -> Self {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         let mut d = Self(Decimal::zero());
-        while let Some(i) = iter.next() {
+        for i in iter {
             d += i
         }
         d
@@ -474,7 +478,7 @@ impl Sum for Dec {
 impl Product for Dec {
     fn product<I: Iterator<Item = Self>>(mut iter: I) -> Self {
         let mut d = Self(Decimal::one());
-        while let Some(i) = iter.next() {
+        for i in iter {
             d *= i
         }
         d

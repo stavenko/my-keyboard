@@ -7,9 +7,13 @@ use stl_io::{Triangle, Vector};
 use self::{decimal::Dec, plane::Plane};
 
 pub mod decimal;
+pub mod line;
+pub mod line2d;
 pub mod origin;
 pub mod plane;
 pub mod polygon;
+pub mod segment;
+pub mod segment2d;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Face {
@@ -106,7 +110,6 @@ impl From<[Vector3<Dec>; 3]> for Face {
     }
 }
 
-pub type Line = [Vector2<Dec>; 2];
 pub type LineIx = [usize; 2];
 
 #[derive(Clone)]
@@ -165,29 +168,5 @@ impl Iterator for Segments {
             let next = Dec::from(next) / Dec::from(self.segments);
             Some((first, next))
         }
-    }
-}
-#[derive(Debug, PartialEq)]
-pub struct Segment<T> {
-    pub from: T,
-    pub to: T,
-}
-#[cfg(test)]
-mod tests {
-    use super::Segments;
-
-    #[test]
-    fn simple_segments() {
-        let s = Segments::new(2).collect::<Vec<_>>();
-        assert_eq!(s, vec!((0.into(), 0.5.into()), (0.5.into(), 1.0.into())));
-        let s = Segments::new(3).collect::<Vec<_>>();
-        assert_eq!(
-            s,
-            vec![
-                (0.0.into(), 0.33333334.into()),
-                (0.33333334.into(), 0.6666667.into()),
-                (0.6666667.into(), 1.0.into())
-            ]
-        );
     }
 }

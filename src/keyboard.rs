@@ -1,7 +1,8 @@
+use anyhow::anyhow;
 use rust_decimal_macros::dec;
 use std::cmp::Ordering;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use nalgebra::Vector3;
 use num_traits::{One, Signed, Zero};
 use rust_decimal::Decimal;
@@ -185,8 +186,8 @@ impl KeyboardConfig {
 
     pub fn build_total_wall(&self) -> Result<Mesh, anyhow::Error> {
         let mut edge_items = self.edge_around().take(10).peekable();
-        let mut meshes = Vec::new();
-        let mut corners = Vec::new();
+        let mut mesh: Option<Mesh> = None;
+        // let mut corners = Vec::new();
         while let Some(surface_edge) = edge_items.next() {
             let base_plane = self.get_base_plane_projection(&surface_edge);
             let inner = SurfaceBetweenTwoEdgePaths::new(
@@ -198,7 +199,17 @@ impl KeyboardConfig {
                 base_plane.outer.clone(),
             );
             let hull: Hull<Four> = (inner, outer).try_into()?;
-            meshes.push(hull.try_into()?);
+            if let Some(body) = mesh.take() {
+                match body.boolean_union(hull.try_into()?) {
+                    Either::Left(result) => mesh = Some(result),
+                    Either::Right(_) => {
+                        return Err(anyhow!("Couldn't join two meshes"));
+                    }
+                }
+            } else {
+                mesh = Some(hull.try_into()?);
+            }
+
             if let Some(next_surface_edge) = edge_items.peek() {
                 let cur_edge_dir = surface_edge.outer.get_edge_dir(Dec::one());
                 let next_edge_dir = next_surface_edge.outer.get_edge_dir(Dec::zero());
@@ -273,15 +284,21 @@ impl KeyboardConfig {
                     );
                     let hull: Hull<Three> = (inner_bezier, outer_bezier).try_into()?;
                     //faces.join(hull)?;
-                    corners.push(hull.try_into()?);
+                    // corners.push(hull.try_into()?);
+                    if let Some(body) = mesh.take() {
+                        match body.boolean_union(hull.try_into()?) {
+                            Either::Left(result) => mesh = Some(result),
+                            Either::Right(_) => {
+                                return Err(anyhow!("Couldn't join two meshes"));
+                            }
+                        }
+                    } else {
+                        mesh = Some(hull.try_into()?);
+                    }
                 }
             }
         }
-        meshes
-            .into_iter()
-            .chain(corners)
-            .reduce(|m: Mesh, mm| m.join(mm))
-            .ok_or(anyhow::anyhow!("reducing meshes failed"))
+        mesh.ok_or(anyhow!("Mesh is not created"))
     }
 
     fn thumb_main_top_transition(&self) -> impl Iterator<Item = HullEdgeItem<BezierEdge>> + '_ {

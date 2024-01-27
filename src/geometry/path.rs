@@ -7,7 +7,7 @@ use self::segment::EdgeSegment;
 use super::primitives::decimal::Dec;
 
 pub(crate) mod bezier;
-pub mod polypath;
+// pub mod polypath;
 pub(crate) mod segment;
 
 #[derive(Clone, Debug)]
