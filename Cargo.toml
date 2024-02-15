@@ -1,26 +1,7 @@
-[package]
-name = "dactyl-manuform"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+resolver = "2"
+members = [
+  "geometry"
+, "keyboard", "smol"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies.scad]
-git = "ssh://git@github.com/stavenko/Rust-Scad.git"
-
-[dependencies]
-anyhow = "1.0.75"
-approx = "0.5.1"
-assert_matches = "1.5.0"
-bezier-nd = "0.5.0"
-clap = { version = "4.4.8", features = ["derive"] }
-itertools = "0.12.0"
-nalgebra = "0.32.3"
-num-traits = "0.2.17"
-rayon = "1.8.0"
-rust_decimal = { version = "1.33.1", features = ["maths"] }
-rust_decimal_macros = "1.33.1"
-seq-macro = "0.3.5"
-simba = { version = "0.8.1", features = ["decimal"] }
-stl_io = "0.7.0"
 
