@@ -61,5 +61,6 @@ pub enum Location {
 
 pub trait Splitter<Item> {
     fn split(&self, item: Item) -> SplitResult<Item>;
+    fn locate(&self, item: Item) -> Location;
     fn from_item(item: &Item) -> Self;
 }

@@ -2,15 +2,31 @@ use core::fmt;
 
 use itertools::Either;
 use nalgebra::{ComplexField, Vector2};
+use num_traits::{One, Zero};
 
-use crate::{bsp::Reversable, primitives::decimal::EPS};
+use crate::{
+    bsp::Reversable,
+    primitives::decimal::{EPS, STABILITY_ROUNDING},
+};
 
 use super::{decimal::Dec, line2d::Line2D};
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct Segment2D {
     pub from: Vector2<Dec>,
     pub to: Vector2<Dec>,
+}
+
+impl PartialEq for Segment2D {
+    fn eq(&self, other: &Self) -> bool {
+        let fd = self.from - other.from;
+        let td = self.to - other.to;
+
+        let fd = fd.magnitude_squared().round_dp(STABILITY_ROUNDING);
+        let td = td.magnitude_squared().round_dp(STABILITY_ROUNDING);
+
+        fd == Dec::zero() && td == Dec::zero()
+    }
 }
 
 impl Reversable for Segment2D {
@@ -36,6 +52,21 @@ impl fmt::Debug for Segment2D {
 }
 
 impl Segment2D {
+    pub fn remove_opposites(mut segments: Vec<Self>) -> Vec<Self> {
+        let mut joined = Vec::new();
+        while let Some(left) = segments.pop() {
+            let inv = left.clone().flip();
+            match segments.iter().position(|segment| *segment == inv) {
+                None => joined.push(left),
+                Some(ix) => {
+                    dbg!("wtf", inv);
+                    segments.swap_remove(ix);
+                }
+            }
+        }
+        joined
+    }
+
     pub fn new(from: Vector2<Dec>, to: Vector2<Dec>) -> Self {
         Self { from, to }
     }
@@ -54,8 +85,18 @@ impl Segment2D {
     }
 
     pub fn join(self, other: Self) -> Either<Self, (Self, Self)> {
-        let angle = self.angle_between(&other);
-        if angle.abs() < EPS {
+        let self_dir_norm = self.dir().magnitude_squared().round_dp(STABILITY_ROUNDING);
+        let self_dir_norm = self_dir_norm.sqrt();
+
+        let other_dir_norm = other.dir().magnitude_squared().round_dp(STABILITY_ROUNDING);
+        let other_dir_norm = other_dir_norm.sqrt();
+
+        let similarity = (self.dir() / self_dir_norm)
+            .dot(&(other.dir() / other_dir_norm))
+            .round_dp(STABILITY_ROUNDING - 2);
+        dbg!(similarity);
+
+        if similarity == Dec::one() {
             let dot = self.dir().normalize().dot(&other.dir().normalize());
             if dot < -EPS {
                 panic!("segments with different directions");

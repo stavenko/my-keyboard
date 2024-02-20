@@ -1,6 +1,7 @@
 use std::fmt;
 
 use itertools::Itertools;
+use nalgebra::Vector3;
 
 use crate::primitives::cutter::{SplitResult, Splitter};
 
@@ -118,149 +119,6 @@ where
         })
     }
 
-    pub fn union(self, other: Self) -> Vec<Item> {
-        let total_segments = self.clone().into_iter().chain(other.clone()).collect_vec();
-        let total_segments = self.clip(total_segments);
-        let total_segments = other.clip(total_segments);
-
-        let (_front1, back1) = other.sort_front_back(total_segments.clone());
-
-        let (_front2, mut back2) = self.sort_front_back(total_segments);
-
-        dbg!(&_front1);
-        dbg!(&back1);
-
-        dbg!(&_front2);
-        dbg!(&back2);
-
-        let mut joined = Vec::new();
-        for s in back1.into_iter() {
-            let inv = s.clone().flip();
-            if let Some(ix) = back2.iter().position(|item| *item == inv) {
-                back2.swap_remove(ix);
-            } else {
-                joined.push(s);
-            }
-        }
-        joined.extend(back2);
-
-        joined
-    }
-
-    pub fn diff(self, other: Self) -> Vec<Item> {
-        todo!("")
-        /*
-        let (_front1, back1) = other
-            .clone()
-            .clip_segments_by_front_back(self.clone().into_iter().collect_vec());
-        let (mut front2, _back2) = self
-            .clone()
-            .clip_segments_by_front_back(other.clone().into_iter().collect_vec());
-
-        let mut joined = Vec::new();
-        for s in back1.into_iter() {
-            let inv = s.clone().flip();
-            if let Some(ix) = front2.iter().position(|item| *item == inv) {
-                front2.swap_remove(ix);
-            } else {
-                joined.push(s);
-            }
-        }
-
-        joined.extend(front2.into_iter().map(|s| s.flip()));
-
-        joined
-        */
-    }
-    /*
-
-    pub(crate) fn merge_tree(&mut self, mut other: Self) {
-        let mut lines = other.coplanar_front;
-        lines.append(&mut other.coplanar_back);
-        let mut results = self.clip_segments(lines);
-
-        self.coplanar_front.append(&mut results.coplanar_front);
-        self.coplanar_back.append(&mut results.coplanar_back);
-
-        if let Some(front) = self.front.as_mut() {
-            front.join_segments(results.front);
-        } else {
-            self.front = Self::build(results.front).map(Box::new);
-        }
-        if let Some(back) = self.back.as_mut() {
-            back.join_segments(results.back);
-        } else {
-            self.back = Self::build(results.back).map(Box::new);
-        }
-
-        if let Some(other_front) = other.front.take() {
-            self.merge_tree(*other_front);
-        }
-        if let Some(other_back) = other.back.take() {
-            self.merge_tree(*other_back);
-        }
-    }
-
-    pub(crate) fn join_segments(&mut self, segments: Vec<Item>) {
-        let mut splitted = self.clip_segments(segments);
-
-        self.coplanar_front.append(&mut splitted.coplanar_front);
-        self.coplanar_back.append(&mut splitted.coplanar_front);
-        if let Some(front) = self.front.as_mut() {
-            front.join_segments(splitted.front);
-        } else {
-            self.front = Self::build(splitted.front).map(Box::new);
-        }
-
-        if let Some(back) = self.back.as_mut() {
-            back.join_segments(splitted.back);
-        } else {
-            self.back = Self::build(splitted.back).map(Box::new);
-        }
-    }
-
-    pub(crate) fn clip_by(self, mm: &Self) -> (Self, Self) {
-        let Self {
-            coplanar_front,
-            mut coplanar_back,
-            mut front,
-            mut back,
-            cutter,
-        } = self;
-        let mut segments = coplanar_front;
-        segments.append(&mut coplanar_back);
-        let mut results = mm.clip_segments(segments);
-        let mut front_tree = Self::new(cutter.clone());
-        let mut back_tree = Self::new(cutter);
-
-        front_tree.coplanar_front = results.coplanar_front;
-        front_tree.join_segments(results.front);
-
-        back_tree.coplanar_back = results.coplanar_back;
-        back_tree.join_segments(results.back);
-
-        if let Some(tree) = front.take() {
-            let (fftree, bbtree) = tree.clip_by(mm);
-            if let Some(t) = front_tree.front.as_mut() {
-                t.merge(fftree);
-            }
-            if let Some(t) = back_tree.front.as_mut() {
-                t.merge(bbtree);
-            }
-        }
-        if let Some(tree) = back.take() {
-            let (fftree, bbtree) = tree.clip_by(mm);
-            if let Some(t) = front_tree.front.as_mut() {
-                t.merge(fftree);
-            }
-            if let Some(t) = back_tree.front.as_mut() {
-                t.merge(bbtree);
-            }
-        }
-        (front_tree, back_tree)
-    }
-    */
-
     pub(crate) fn invert(mut self) -> Self {
         let coplanar_back = self.coplanar_front.into_iter().map(|f| f.flip()).collect();
         let coplanar_front = self.coplanar_back.into_iter().map(|f| f.flip()).collect();
@@ -294,23 +152,18 @@ where
                 },
             );
 
-        //dbg!(front.len());
-        //dbg!(back.len());
-
         let mut split_result = SplitResult::default();
 
         if let Some(tree) = self.front.as_ref() {
             let (f, b) = tree.sort_front_back(front);
             split_result = split_result.fronts(f).backs(b)
         } else {
-            //println!("no_front_tree");
             split_result = split_result.fronts(front)
         }
         if let Some(tree) = self.back.as_ref() {
             let (f, b) = tree.sort_front_back(back);
             split_result = split_result.fronts(f).backs(b)
         } else {
-            //println!("no_back_tree");
             split_result = split_result.backs(back)
         }
         (split_result.front, split_result.back)
@@ -432,6 +285,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Debug;
+
     use assert_matches::assert_matches;
     use itertools::{Either, Itertools};
     use nalgebra::{Vector2, Vector3};
@@ -444,7 +299,7 @@ mod tests {
         mesh::Mesh,
         primitives::{
             basis::Basis,
-            cutter::SplitResult,
+            cutter::{SplitResult, Splitter},
             decimal::Dec,
             line2d::Line2D,
             plane::Plane,
@@ -454,6 +309,8 @@ mod tests {
         },
         shapes::rect,
     };
+
+    use super::Reversable;
 
     /*
     #[test]
@@ -577,7 +434,7 @@ mod tests {
             to: Vector2::new(Dec::from(dec!(-0.2)), Dec::from(dec!(0.6))),
         }];
 
-        let result = bsp_2d_one.diff(bsp_2d_two);
+        let result = diff(bsp_2d_one, bsp_2d_two);
         let lines = dbg!(result.into_iter().collect_vec());
         dbg!(lines.len());
         let polygons = Polygon::from_segments(lines, &basis).unwrap();
@@ -621,7 +478,7 @@ mod tests {
             to: Vector2::new(Dec::from(dec!(-0.2)), Dec::from(dec!(0.6))),
         }];
 
-        let lines = bsp_2d_one.union(bsp_2d_two).into_iter().collect_vec();
+        let lines = union(bsp_2d_one, bsp_2d_two).into_iter().collect_vec();
         dbg!(lines.len());
         let polygons = Polygon::from_segments(lines, &basis).unwrap();
         assert_eq!(polygons.len(), 1);
@@ -729,12 +586,7 @@ mod tests {
 
     #[test]
     fn merge_cubes() {
-        let z = Basis {
-            x: Vector3::x(),
-            y: Vector3::y(),
-            z: Vector3::z(),
-            center: Vector3::zeros(),
-        };
+        let z = Basis::new(Vector3::x(), Vector3::y(), Vector3::z(), Vector3::zeros()).unwrap();
         let cube_smaller = rect(z.clone(), Dec::one(), Dec::one(), Dec::one());
 
         let cube_bigger = rect(z, Dec::one() * 2, Dec::one() * 2, Dec::one() * 2);
@@ -745,6 +597,42 @@ mod tests {
         assert_eq!(mesh.sides.len(), 6);
     }
 
+    pub fn union<S, I>(right: Bsp<S, I>, other: Bsp<S, I>) -> Vec<I>
+    where
+        S: Splitter<I> + Clone + Reversable + Debug,
+        I: Clone + Debug + Reversable + PartialEq + 'static,
+    {
+        let total_segments = right.clone().into_iter().chain(other.clone()).collect_vec();
+        let total_segments = right.clip(total_segments);
+        let total_segments = other.clip(total_segments);
+
+        let (_front1, back1) = other.sort_front_back(total_segments.clone());
+
+        let (_front2, mut back2) = right.sort_front_back(total_segments);
+
+        dbg!(&_front1);
+        dbg!(&back1);
+
+        dbg!(&_front2);
+        dbg!(&back2);
+
+        let mut joined = Vec::new();
+        for s in back1.into_iter() {
+            let inv = s.clone().flip();
+            if let Some(ix) = back2.iter().position(|item| *item == inv) {
+                back2.swap_remove(ix);
+            } else {
+                joined.push(s);
+            }
+        }
+        joined.extend(back2);
+
+        joined
+    }
+
+    pub fn diff<S: Splitter<I> + Clone, I: Clone>(right: Bsp<S, I>, other: Bsp<S, I>) -> Vec<I> {
+        todo!()
+    }
     /*
         #[test]
         fn cut_polygon_with_cube() {

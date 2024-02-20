@@ -1,17 +1,17 @@
+use rand::Rng;
 use std::{collections::VecDeque, fmt};
 
 use anyhow::anyhow;
 use itertools::{Either, Itertools};
 use nalgebra::{Vector2, Vector3};
 use num_traits::{Signed, Zero};
-use rust_decimal_macros::dec;
 
 use crate::bsp::{Bsp, Reversable};
 
 use super::{
-    decimal::Dec,
+    decimal::{Dec, STABILITY_ROUNDING},
     line2d::Line2D,
-    plane::{self, Plane},
+    plane::Plane,
     polygon_basis::PolygonBasis,
     segment::Segment,
     segment2d::Segment2D,
@@ -21,7 +21,6 @@ use super::{
 #[derive(Clone)]
 pub struct Polygon {
     pub vertices: Vec<Vector3<Dec>>,
-    //basis: PolygonBasis,
     plane: Plane,
 }
 
@@ -33,12 +32,19 @@ impl PartialEq for Polygon {
             false
         } else {
             let first = self.vertices.first().expect("Duude");
-            let other_ix = other.vertices.iter().position(|p| p == first);
+            let other_ix = other.vertices.iter().position(|p| {
+                let d = (p - first).magnitude_squared().round_dp(STABILITY_ROUNDING);
+
+                d == Dec::zero()
+            });
 
             other_ix.is_some_and(|other_ix| {
                 for i in 1..self.vertices.len() {
                     let oix = (other_ix + i) % self.vertices.len();
-                    if self.vertices[i] != other.vertices[oix] {
+                    let d = (self.vertices[i] - other.vertices[oix])
+                        .magnitude_squared()
+                        .round_dp(STABILITY_ROUNDING);
+                    if d != Dec::zero() {
                         return false;
                     }
                 }
@@ -77,11 +83,43 @@ impl Reversable for Polygon {
 }
 
 impl Polygon {
-    /*
-    pub fn get_basis_2d(&self) -> PolygonBasis {
-        self.basis.clone()
+    pub fn svg_debug(&self, basis: &PolygonBasis) -> String {
+        let mut items = Vec::new();
+        let colors = ["red", "green", "blue", "orange", "purple"];
+        let mut path = Vec::new();
+        for (ix, v) in self.vertices.iter().enumerate() {
+            let vv = basis.project_on_plane_z(v);
+            if ix <= 2 {
+                items.push(format!(
+                    "<circle cx=\"{}\" cy=\"{}\" r=\"0.08\" fill=\"{}\"/> ",
+                    vv.x.round_dp(4),
+                    vv.y.round_dp(4),
+                    colors[ix],
+                ))
+            }
+            if ix == 0 {
+                path.push(format!("M {} {}", vv.x.round_dp(4), vv.y.round_dp(4)));
+            } else {
+                path.push(format!("L {} {}", vv.x.round_dp(4), vv.y.round_dp(4)));
+            }
+        }
+        path.push("z".to_string());
+        let c = colors[rand::thread_rng().gen_range(0..colors.len())];
+        items.push(format!(
+            "<path stroke=\"{}\" stroke-width=\"0.06\" d = \"{}\" />",
+            c,
+            path.join(" ")
+        ));
+        items.join("\n")
     }
-    */
+
+    pub fn polygon_union(one: Vec<Polygon>, other: Vec<Polygon>) -> Vec<Polygon> {
+        dbg!(one.len());
+
+        let r: Vec<Polygon> = one.into_iter().filter(|p| other.contains(p)).collect();
+        dbg!(r.len());
+        r
+    }
 
     pub fn get_segments_with_basis(&self, basis: &PolygonBasis) -> Vec<Segment2D> {
         let mut vv = self.vertices.iter().peekable();
@@ -127,37 +165,45 @@ impl Polygon {
     }
 
     pub fn calculate_plane(vertices: &[Vector3<Dec>]) -> anyhow::Result<Plane> {
-        let u = vertices.first().ok_or(anyhow!("not a single point"))?;
-        let v = vertices.get(1).ok_or(anyhow!("only one point"))?;
-        let w = vertices.get(2).ok_or(anyhow!("need 3 points at least"))?;
+        let v = vertices.first().ok_or(anyhow!("not a single point"))?;
+        let w = vertices.get(1).ok_or(anyhow!("only one point"))?;
 
+        let sum: Vector3<Dec> = vertices.iter().copied().fold(Vector3::zero(), |a, b| a + b);
+        let center = sum / Dec::from(vertices.len());
+        let u = center;
         let a = v - u;
         let b = w - u;
 
         let cross = &a.cross(&b);
-        let sum: Vector3<Dec> = vertices.iter().copied().fold(Vector3::zero(), |a, b| a + b);
-        let center = sum / Dec::from(vertices.len());
-        let plane = Plane::new_from_normal_and_point(cross.normalize(), center);
+        let mut plane = Plane::new_from_normal_and_point(cross.normalize(), center);
+        let x = a.normalize();
+        let y = b.normalize();
+
+        let mut total_area = Dec::zero();
+        for current in 0..vertices.len() {
+            let next = (current + 1) % vertices.len();
+            let x1 = vertices[current].dot(&x);
+            let y1 = vertices[current].dot(&y);
+            let x2 = vertices[next].dot(&x);
+            let y2 = vertices[next].dot(&y);
+            total_area += x1 * y2 - x2 * y1;
+        }
+        if total_area.is_negative() {
+            plane = plane.flip();
+            dbg!("FLOP");
+        }
+
         Ok(plane)
     }
 
     pub fn calculate_basis_2d(vertices: &[Vector3<Dec>]) -> anyhow::Result<PolygonBasis> {
-        let u = vertices.first().ok_or(anyhow!("not a single point"))?;
-        let v = vertices.get(1).ok_or(anyhow!("only one point"))?;
-        let w = vertices.get(2).ok_or(anyhow!("need 3 points at least"))?;
-
-        let a = v - u;
-        let b = w - u;
-
-        let cross = &a.cross(&b);
-        if cross.magnitude() == dec!(0).into() {
-            Err(anyhow::anyhow!("Normal to this polyton calculated as 0"))?;
-        }
-        let normal = cross.normalize();
+        let plane = Self::calculate_plane(vertices)?;
         let sum: Vector3<Dec> = vertices.iter().copied().fold(Vector3::zero(), |a, b| a + b);
         let center = sum / Dec::from(vertices.len());
-        let plane_x = a.normalize();
-        let plane_y = plane_x.cross(&normal).normalize();
+        let v = vertices.first().ok_or(anyhow!("not a single point"))?;
+        let plane_x = (v - center).normalize();
+        let plane_y = plane.normal().cross(&plane_x).normalize();
+
         Ok(PolygonBasis {
             center,
             x: plane_x,
@@ -213,7 +259,7 @@ impl Polygon {
     }
 
     fn join_segments_2d(segments: Vec<Segment2D>) -> Vec<Segment2D> {
-        if segments.len() == 1 {
+        if segments.len() <= 2 {
             return segments;
         }
 
@@ -231,7 +277,6 @@ impl Polygon {
                     }
                 }
             } else {
-                // possibly, the last could be join with the first;
                 result.rotate_left(1);
                 if let Some(seg) = result.pop() {
                     match seg.join(b) {
@@ -312,16 +357,21 @@ impl Polygon {
 
         (ordered_segments, tails)
     }
+
     pub fn segment_loops(mut segments: VecDeque<Segment2D>) -> Vec<Vec<Segment2D>> {
         let mut result = Vec::new();
         let mut new_loop: Vec<Segment2D> = Vec::new();
         loop {
             if let Some(last) = new_loop.last() {
-                if let Some(ix) = segments.iter().position(|s| s.from == last.to) {
+                if let Some(ix) = segments.iter().position(|s| {
+                    let d = (s.from - last.to)
+                        .magnitude_squared()
+                        .round_dp(STABILITY_ROUNDING);
+                    d == Dec::zero()
+                }) {
                     let item = segments.remove(ix).expect("we just found it");
                     new_loop.push(item);
                 } else {
-                    // dbg!(&new_loop);
                     result.push(Self::join_segments_2d(new_loop));
                     new_loop = Vec::new();
                 }
@@ -331,7 +381,6 @@ impl Polygon {
                 break;
             }
         }
-        //dbg!(&result);
 
         result
     }
@@ -383,8 +432,11 @@ impl Polygon {
     }
 
     pub fn new(vertices: Vec<Vector3<Dec>>) -> anyhow::Result<Self> {
-        //let basis = Self::calculate_basis_2d(&vertices)?;
         let plane = Self::calculate_plane(&vertices)?;
+        Ok(Self { vertices, plane })
+    }
+
+    pub fn new_with_plane(vertices: Vec<Vector3<Dec>>, plane: Plane) -> anyhow::Result<Self> {
         Ok(Self { vertices, plane })
     }
 
@@ -448,31 +500,71 @@ impl Polygon {
         );
     }
 
+    pub fn remove_opposites(mut segments: Vec<Segment2D>) -> Vec<Segment2D> {
+        let mut joined = Vec::new();
+        while let Some(left) = segments.pop() {
+            let inv = left.clone().flip();
+            match segments.iter().position(|segment| *segment == inv) {
+                None => joined.push(left),
+                Some(ix) => {
+                    dbg!("~~~~~~ remove ~~~~~~");
+                    segments.swap_remove(ix);
+                }
+            }
+        }
+        joined
+    }
+
     pub fn boolean_union(self, other: Self) -> Either<Vec<Polygon>, [Polygon; 2]> {
-        println!("\n++++++++++++++++++++++++++++++++++++++++\n");
-        dbg!(self.plane.normal().dot(&other.plane.normal()));
-        let basis = Self::calculate_basis_2d(&self.vertices).unwrap();
-        let my_segments = self.get_segments_with_basis(&basis);
-        let other_segments = other.get_segments_with_basis(&basis);
-        let my = Bsp::<Line2D, Segment2D>::build(my_segments.clone());
-        let other_bsp = Bsp::<Line2D, Segment2D>::build(other_segments.clone());
-        dbg!(&my_segments);
-        dbg!(&other_segments);
-        match (my, other_bsp) {
-            (None, None) => Either::Right([self, other]),
-            (None, Some(_)) => Either::Right([self, other]),
-            (Some(_), None) => Either::Right([self, other]),
-            (Some(my), Some(other_bsp)) => {
-                dbg!("ok");
-                let union = my.union(other_bsp);
+        if self.get_normal().dot(&other.get_normal()) == Dec::from(-1) {
+            println!("WARN! flip opposite and diff");
+            Either::Right([self, other])
+        } else {
+            let basis = Self::calculate_basis_2d(&self.vertices).unwrap();
+            println!("~~~~~~~~~start~~~~~~~~~~~~");
+            println!("{}", self.svg_debug(&basis));
+            println!("{}", other.svg_debug(&basis));
+            let my_segments = self.get_segments_with_basis(&basis);
+            let other_segments = other.get_segments_with_basis(&basis);
 
-                let items = union.into_iter().collect_vec();
+            //dbg!(&my_segments);
+            //dbg!(&other_segments);
 
-                let polygons = Self::from_segments(items, &basis).unwrap();
-                if polygons.iter().zip(&[&self, &other]).all(|(p, n)| *n == p) {
-                    Either::Right([self, other])
-                } else {
-                    Either::Left(polygons)
+            let my = Bsp::<Line2D, Segment2D>::build(my_segments.clone());
+            let other_bsp = Bsp::<Line2D, Segment2D>::build(other_segments.clone());
+            match (my, other_bsp) {
+                (None, None) => Either::Right([self, other]),
+                (None, Some(_)) => Either::Right([self, other]),
+                (Some(_), None) => Either::Right([self, other]),
+                (Some(my), Some(other_bsp)) => {
+                    let mut total_segments = my_segments;
+                    total_segments.extend(other_segments);
+
+                    //let  = my.clip(other_segments);
+                    //let my_clipped = other_bsp.clip(my_segments);
+
+                    let (front_my, mut back_my) = my.sort_front_back(total_segments);
+                    dbg!(&front_my, &back_my);
+                    let (front_other, back_other) = other_bsp.sort_front_back(front_my);
+                    dbg!(&front_other, &back_other);
+                    // Front is outside for positive
+                    // And negative polygons are not supported:
+                    // It is supported, when we have positive polygons with opposite normals
+                    back_my.extend(back_other);
+                    let resulting_segments = Self::remove_opposites(back_my);
+                    // dbg!(&resulting_segments);
+
+                    let polygons = Self::from_segments(resulting_segments, &basis).unwrap();
+                    dbg!("collected");
+                    polygons
+                        .iter()
+                        .for_each(|p| println!("{}", p.svg_debug(&basis)));
+                    println!("~~~~~~~~~end~~~~~~~~~~~~");
+                    if polygons.iter().zip(&[&self, &other]).all(|(p, n)| *n == p) {
+                        Either::Right([self, other])
+                    } else {
+                        Either::Left(polygons)
+                    }
                 }
             }
         }

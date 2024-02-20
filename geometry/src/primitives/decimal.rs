@@ -19,6 +19,7 @@ use simba::scalar::{SubsetOf, SupersetOf};
 pub struct Dec(Decimal);
 
 pub const EPS: Dec = Dec(dec!(1e-8));
+pub const STABILITY_ROUNDING: u32 = 27;
 
 impl SubsetOf<Dec> for Dec {
     fn to_superset(&self) -> Dec {
@@ -200,7 +201,8 @@ impl ComplexField for Dec {
     }
 
     fn sqrt(self) -> Self {
-        Self(self.0.sqrt().expect("Only positive numbers"))
+        // Self(self.0.powd(dec!(0.5)))
+        Self(self.0.sqrt().expect("aaa"))
     }
 
     fn exp(self) -> Self {

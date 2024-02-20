@@ -32,7 +32,7 @@ impl PolygonBasis {
     }
 
     pub fn unproject(&self, point: &Vector2<Dec>) -> Vector3<Dec> {
-        let PolygonBasis { center, x, y, .. } = self;
+        let PolygonBasis { center, x, y } = self;
         center + x * point.x + y * point.y
     }
 }

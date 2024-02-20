@@ -1,4 +1,6 @@
-use itertools::{Itertools, PutBack};
+use std::fmt;
+
+use itertools::Itertools;
 use nalgebra::{ComplexField, Vector3};
 use num_traits::{One, Zero};
 use rust_decimal_macros::dec;
@@ -7,15 +9,27 @@ use crate::bsp::Reversable;
 
 use super::{
     cutter::{Location, SplitResult, Splitter},
-    decimal::Dec,
+    decimal::{Dec, STABILITY_ROUNDING},
     polygon::Polygon,
-    Face,
 };
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Hash)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Hash)]
 pub struct Plane {
     normal: Vector3<Dec>,
     d: Dec,
+}
+
+impl fmt::Debug for Plane {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}x  {}y {}z {}",
+            self.normal.x.round_dp(4),
+            self.normal.y.round_dp(4),
+            self.normal.z.round_dp(4),
+            self.d.round_dp(4)
+        )
+    }
 }
 
 impl Reversable for Plane {
@@ -52,6 +66,10 @@ impl Splitter<Polygon> for Plane {
 
     fn from_item(item: &Polygon) -> Self {
         item.get_plane()
+    }
+
+    fn locate(&self, item: Polygon) -> Location {
+        todo!()
     }
 }
 /*
@@ -107,6 +125,22 @@ enum Location {
 */
 
 impl Plane {
+    pub fn is_same_or_opposite(&self, other: &Self) -> bool {
+        if self
+            .normal
+            .dot(&other.normal)
+            .abs()
+            .round_dp(STABILITY_ROUNDING)
+            == Dec::one()
+        {
+            let m = self.normal * self.d;
+            let o = other.normal * other.d;
+            (m - o).magnitude_squared().round_dp(STABILITY_ROUNDING) == Dec::zero()
+        } else {
+            false
+        }
+    }
+
     pub fn new_from_normal_and_point(normal: Vector3<Dec>, point: Vector3<Dec>) -> Self {
         let d = normal.dot(&point);
 
@@ -160,38 +194,13 @@ impl Plane {
                 _ => {}
             }
         }
-        (Polygon::new(front).unwrap(), Polygon::new(back).unwrap())
-    }
-    /*
-    fn split_fbb(
-        f: Vector3<Dec>,
-        b1: Vector3<Dec>,
-        b2: Vector3<Dec>,
-        normal: Vector3<Dec>,
-        o: Vector3<Dec>,
-        n: Vector3<Dec>,
-    ) -> (Face, [Face; 2]) {
-        let d = (f - o).dot(&n);
-
-        let t = d / (f - b1).dot(&n);
-        let u = f.lerp(&b1, t);
-        let s = d / (f - b2).dot(&n);
-        let v = f.lerp(&b2, s);
-        if t < Dec::zero() || s < Dec::zero() || s > Dec::one() || t > Dec::one() {
-            dbg!(t);
-            panic!("out of t {t} or s {s}");
-        }
-
         (
-            Face::new_with_normal([f, u, v], normal),
-            [
-                Face::new_with_normal([u, b1, b2], normal),
-                Face::new_with_normal([u, b2, v], normal),
-            ],
+            Polygon::new_with_plane(front, polygon.get_plane().to_owned()).unwrap(),
+            Polygon::new_with_plane(back, polygon.get_plane().to_owned()).unwrap(),
         )
     }
-    */
 
+    /*
     fn split_fcb(
         f: Vector3<Dec>,
         c: Vector3<Dec>,
@@ -234,6 +243,7 @@ impl Plane {
             Face::new_with_normal([c, f, u], normal),
         )
     }
+    */
 
     fn location(&self, v: &Vector3<Dec>) -> Location {
         let eps: Dec = dec!(1e-9).into();
@@ -259,9 +269,8 @@ impl Plane {
 mod tests {
     use nalgebra::Vector3;
     use rust_decimal_macros::dec;
-    use stl_io::Vector;
 
-    use crate::primitives::{cutter::Splitter, decimal::Dec, origin, polygon::Polygon};
+    use crate::primitives::{cutter::Splitter, decimal::Dec, polygon::Polygon};
 
     use super::Plane;
 

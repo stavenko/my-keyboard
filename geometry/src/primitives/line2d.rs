@@ -116,6 +116,37 @@ impl Splitter<Segment2D> for Line2D {
     fn from_item(item: &Segment2D) -> Self {
         item.get_line()
     }
+
+    fn locate(&self, item: Segment2D) -> Location {
+        let eps: Dec = dec!(1e-12).into();
+        let ft = item.dir();
+        let from = item.from - self.origin;
+        let to = item.to - self.origin;
+        let k_from = Self::kross(&self.dir, &from);
+        let k_to = Self::kross(&self.dir, &to);
+        let k_to_dir = Self::kross(&self.dir, &ft);
+        let loc = |k| {
+            if k > eps {
+                Location::Front
+            } else if k < -eps {
+                Location::Back
+            } else {
+                Location::Coplanar
+            }
+        };
+        match (loc(k_from), loc(k_to)) {
+            (Location::Front, Location::Front) => Location::Front,
+            (Location::Back, Location::Back) => Location::Back,
+            (Location::Front, Location::Coplanar) => Location::Front,
+            (Location::Back, Location::Coplanar) => Location::Back,
+            (Location::Coplanar, Location::Front) => Location::Front,
+            (Location::Coplanar, Location::Back) => Location::Back,
+
+            _ => unimplemented!(
+                "locate expects only one side segments. clip before calling this function"
+            ),
+        }
+    }
 }
 
 /*
