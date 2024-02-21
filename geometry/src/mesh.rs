@@ -93,39 +93,57 @@ impl Mesh {
             (None, Some(_)) => Either::Right((self, other)),
             (Some(_), None) => Either::Right((self, other)),
             (Some(my), Some(other_bsp)) => {
-                //let mut total_polygons = self.polygons();
-                // total_polygons.extend(other.polygons());
                 let my_clipped = my.clip(self.polygons());
                 let my_clipped = other_bsp.clip(my_clipped);
 
                 let other_clipped = my.clip(other.polygons());
                 let other_clipped = other_bsp.clip(other_clipped);
 
-                //let total_polygons = my.clip(total_polygons);
-                //let total_polygons = other_bsp.clip(total_polygons);
                 let (front_my, back_my) = my.sort_front_back(other_clipped);
                 let (front_other, back_other) = other_bsp.sort_front_back(my_clipped);
 
-                dbg!(&front_my, &back_my);
-                dbg!(&front_other, &back_other);
-
                 let mut totals = back_my;
-                let dups = dbg!(Polygon::polygon_union(front_my, front_other));
-                //totals.extend(front_other);
+                let dups = Polygon::polygon_union(front_my, front_other);
                 totals.extend(dups);
                 totals.extend(back_other);
-                //totals.extend(back_my);
                 let polygons = Self::remove_opposites(totals);
 
                 let (result, rest) = Self::from_polygons(polygons);
-                dbg!(rest);
 
                 Either::Left(result)
             }
         }
     }
+
     pub fn boolean_diff(self, other: Self) -> Option<Self> {
-        todo!("implement boolean_diff")
+        let my = Bsp::<Plane, Polygon>::build(self.polygons());
+        let other_bsp = Bsp::<Plane, Polygon>::build(other.polygons());
+        match (my, other_bsp) {
+            (None, None) => Some(self),
+            (None, Some(_)) => Some(self),
+            (Some(_), None) => Some(self),
+            (Some(my), Some(other_bsp)) => {
+                let my_clipped = my.clip(self.polygons());
+                let my_clipped = other_bsp.clip(my_clipped);
+
+                let other_clipped = my.clip(other.polygons());
+                let other_clipped = other_bsp.clip(other_clipped);
+
+                let (front_my, back_my) = my.sort_front_back(other_clipped);
+                let (front_other, back_other) = other_bsp.sort_front_back(my_clipped);
+
+                let mut totals = back_other;
+                totals.extend(front_my.into_iter().map(|f| f.flip()));
+                let polygons = Self::remove_opposites(totals);
+                if polygons.is_empty() {
+                    None
+                } else {
+                    let (result, rest) = Self::from_polygons(polygons);
+
+                    Some(result)
+                }
+            }
+        }
     }
     pub fn boolean_intersecion(self, other: Self) -> Option<Self> {
         todo!("implement boolean_intersecion")
@@ -133,6 +151,7 @@ impl Mesh {
     pub fn polygons(&self) -> Vec<Polygon> {
         self.sides.iter().flat_map(|s| s.polygons.clone()).collect()
     }
+
     pub fn group_by_sides(polygons: Vec<Polygon>) -> Vec<Edge> {
         let planes = polygons
             .into_iter()
@@ -159,103 +178,13 @@ impl Mesh {
             .collect()
     }
 
-    pub fn order_polygons_by_adjacency(mut polygons: Vec<Polygon>) -> (Vec<Polygon>, Vec<Polygon>) {
-        let mut result = Vec::new();
-        if let Some(first) = polygons.pop() {
-            result.push(first);
-            let mut current_index = 0;
-            while !polygons.is_empty() {
-                let polygon = if let Some(poly) = result.get(current_index) {
-                    polygons
-                        .iter()
-                        .position(|p| p.is_adjacent(&poly))
-                        .map(|ix| polygons.swap_remove(ix))
-                } else {
-                    None
-                };
-
-                if let Some(polygon) = polygon {
-                    result.push(polygon);
-                } else if current_index < result.len() {
-                    current_index += 1;
-                } else {
-                    break;
-                }
-            }
-        }
-        (result, polygons)
-    }
-
-    /*
-        pub fn join_polygons_on_side(polygons: Vec<Polygon>) -> Vec<Polygon> {
-
-            if polygons.len() <= 2 {
-                return polygons;
-            }
-            let mut polygons: VecDeque<Polygon> = polygons.into();
-
-            'outer: loop {
-                let mut attempts = polygons.len();
-                dbg!(polygons.len());
-                if let Some(mut poly) = polygons.pop_front() {
-                    let b = Polygon::calculate_basis_2d(&poly.vertices).unwrap();
-                    'inner: while let Some(item) = polygons.pop_front() {
-                        match poly.boolean_union(item.clone()) {
-                            Either::Left(different) => {
-                                dbg!("ok");
-                                let len = different.len();
-                                for (ix, p) in different.into_iter().enumerate() {
-                                    if ix == 0 {
-                                        // Solve polygon recombination problem, when sharing one same
-                                        // point
-                                        polygons.push_front(p);
-                                    } else {
-                                        polygons.push_back(p);
-                                    }
-                                }
-                                /*
-                                if len == 2 {
-                                    panic!("TWO");
-                                }
-                                */
-
-                                break 'inner;
-                            }
-                            Either::Right([p, next]) => {
-                                dbg!("fail");
-
-                                poly = p;
-                                polygons.push_back(next);
-                                if attempts == 0 {
-                                    polygons.push_front(poly);
-                                    break 'outer;
-                                }
-                                attempts -= 1;
-                            }
-                        }
-                    }
-                } else {
-                    break;
-                }
-            }
-            dbg!("+++++++++++++done++++++++++++");
-            if polygons.len() > 1 {
-                dbg!(polygons.len());
-                panic!("DEBUG");
-            }
-            polygons.into()
-        }
-    */
-
     pub fn from_polygons(polygons: Vec<Polygon>) -> (Self, Vec<Polygon>) {
         let sides = Self::group_by_sides(polygons);
         let sides = sides
             .into_iter()
             .map(|s| {
                 println!("------------------********---------------------");
-                let s = s.join_polygons_on_side();
-                dbg!(&s.polygons);
-                s
+                s.join_polygons_on_side()
             })
             .collect_vec();
 

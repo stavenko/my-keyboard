@@ -1,4 +1,5 @@
 use core::fmt;
+use std::ops::Neg;
 
 use itertools::Either;
 use nalgebra::{ComplexField, Vector2};
@@ -85,26 +86,27 @@ impl Segment2D {
     }
 
     pub fn join(self, other: Self) -> Either<Self, (Self, Self)> {
-        let self_dir_norm = self.dir().magnitude_squared().round_dp(STABILITY_ROUNDING);
-        let self_dir_norm = self_dir_norm.sqrt();
+        let self_dir_len = self.dir().magnitude_squared().round_dp(STABILITY_ROUNDING);
+        let self_dir_len = self_dir_len.sqrt();
 
-        let other_dir_norm = other.dir().magnitude_squared().round_dp(STABILITY_ROUNDING);
-        let other_dir_norm = other_dir_norm.sqrt();
+        let other_dir_len = other.dir().magnitude_squared().round_dp(STABILITY_ROUNDING);
+        let other_dir_len = other_dir_len.sqrt();
 
-        let similarity = (self.dir() / self_dir_norm)
-            .dot(&(other.dir() / other_dir_norm))
+        let self_dir_normalized = self.dir() / self_dir_len;
+        let other_dir_normalized = other.dir() / other_dir_len;
+
+        let similarity = (self_dir_normalized)
+            .dot(&other_dir_normalized)
             .round_dp(STABILITY_ROUNDING - 2);
-        dbg!(similarity);
 
+        if similarity == Dec::one().neg() {
+            panic!("segments with different directions");
+        }
         if similarity == Dec::one() {
-            let dot = self.dir().normalize().dot(&other.dir().normalize());
-            if dot < -EPS {
-                panic!("segments with different directions");
-            }
             let other_from = other.from - self.from;
             let other_to = other.to - self.from;
-            let tf = other_from.dot(&self.dir().normalize()) / self.dir().magnitude();
-            let tt = other_to.dot(&self.dir().normalize()) / self.dir().magnitude();
+            let tf = other_from.dot(&self_dir_normalized) / self_dir_len;
+            let tt = other_to.dot(&self_dir_normalized) / self_dir_len;
             if (tf - 1) > EPS {
                 Either::Right((self, other))
             } else {
