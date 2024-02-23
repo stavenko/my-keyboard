@@ -3,7 +3,7 @@ use rust_decimal_macros::dec;
 
 use super::{
     decimal::Dec,
-    segment::{self, Segment},
+    segment::{Segment},
 };
 
 #[derive(Clone, Debug)]
@@ -47,7 +47,7 @@ enum Location {
 }
 
 impl Line {
-    fn split(&self, s: &Segment) -> (Segment, Segment) {
+    fn split(&self, _s: &Segment) -> (Segment, Segment) {
         todo!()
     }
 
@@ -62,7 +62,7 @@ impl Line {
             Location::Coplanar
         }
     }
-    pub fn split_segment(&self, segment: Segment) -> SplitResult {
+    pub fn split_segment(&self, _segment: Segment) -> SplitResult {
         todo!();
     }
 

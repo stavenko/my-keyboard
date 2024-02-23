@@ -38,7 +38,7 @@ impl Path for EdgeSegment {
         1
     }
 
-    fn get_tangent(&self, t: Dec) -> Vector3<Dec> {
+    fn get_tangent(&self, _t: Dec) -> Vector3<Dec> {
         todo!()
     }
 

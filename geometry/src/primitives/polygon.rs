@@ -1,4 +1,5 @@
 use rand::Rng;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{collections::VecDeque, fmt};
 
 use anyhow::anyhow;
@@ -56,7 +57,7 @@ impl PartialEq for Polygon {
 
 impl fmt::Debug for Polygon {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "poly\n")?;
+        writeln!(f, "poly")?;
         for v in &self.vertices {
             writeln!(
                 f,
@@ -115,8 +116,9 @@ impl Polygon {
 
     pub fn polygon_union(one: Vec<Polygon>, other: Vec<Polygon>) -> Vec<Polygon> {
         dbg!(one.len());
+        dbg!(other.len());
 
-        let r: Vec<Polygon> = one.into_iter().filter(|p| other.contains(p)).collect();
+        let r: Vec<Polygon> = one.into_par_iter().filter(|p| other.contains(p)).collect();
         dbg!(r.len());
         r
     }
@@ -477,7 +479,7 @@ impl Polygon {
         if let Some(index) = self.vertices.iter().position(|v| *v == segment.to) {
             //dbg!(index);
             let next = (index + 1) % self.vertices.len();
-            let prev = (index + self.vertices.len() - 1) % self.vertices.len();
+            let _prev = (index + self.vertices.len() - 1) % self.vertices.len();
             if self.vertices[next] == segment.from {
                 return true;
                 //} else {
@@ -540,26 +542,15 @@ impl Polygon {
                     let mut total_segments = my_segments;
                     total_segments.extend(other_segments);
 
-                    //let  = my.clip(other_segments);
-                    //let my_clipped = other_bsp.clip(my_segments);
-
                     let (front_my, mut back_my) = my.sort_front_back(total_segments);
-                    dbg!(&front_my, &back_my);
                     let (front_other, back_other) = other_bsp.sort_front_back(front_my);
-                    dbg!(&front_other, &back_other);
-                    // Front is outside for positive
-                    // And negative polygons are not supported:
-                    // It is supported, when we have positive polygons with opposite normals
                     back_my.extend(back_other);
                     let resulting_segments = Self::remove_opposites(back_my);
-                    // dbg!(&resulting_segments);
 
                     let polygons = Self::from_segments(resulting_segments, &basis).unwrap();
-                    dbg!("collected");
                     polygons
                         .iter()
                         .for_each(|p| println!("{}", p.svg_debug(&basis)));
-                    println!("~~~~~~~~~end~~~~~~~~~~~~");
                     if polygons.iter().zip(&[&self, &other]).all(|(p, n)| *n == p) {
                         Either::Right([self, other])
                     } else {
@@ -570,18 +561,16 @@ impl Polygon {
         }
     }
 
-    pub fn boolean_diff(self, other: Self) -> Option<Self> {
+    pub fn boolean_diff(self, _other: Self) -> Option<Self> {
         todo!("implement boolean_diff")
     }
 
-    pub fn boolean_intersecion(self, other: Self) -> Option<Self> {
+    pub fn boolean_intersecion(self, _other: Self) -> Option<Self> {
         todo!("implement boolean_intersecion")
     }
 
     pub(crate) fn is_adjacent(&self, poly: &Polygon) -> bool {
         for s in self.get_segments_3d() {
-            //dbg!("~~~~~~~~~~");
-            //dbg!(&s);
             if poly.has_opposite_segment(&s) {
                 return true;
             }
@@ -596,7 +585,7 @@ mod tests {
     use num_traits::One;
     use rust_decimal_macros::dec;
 
-    use crate::primitives::{basis, decimal::Dec, polygon::Polygon, segment2d::Segment2D};
+    use crate::primitives::{decimal::Dec, polygon::Polygon, segment2d::Segment2D};
 
     use super::PolygonBasis;
 

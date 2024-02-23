@@ -1,4 +1,4 @@
-use nalgebra::UnitVector3;
+
 use nalgebra::Vector3;
 
 use self::bezier::BezierEdge;

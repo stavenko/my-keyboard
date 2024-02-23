@@ -1,4 +1,4 @@
-use nalgebra::{UnitVector3, Vector3};
+use nalgebra::{Vector3};
 use rust_decimal::prelude::One;
 
 use crate::{

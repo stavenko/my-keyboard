@@ -1,6 +1,5 @@
 use nalgebra::{UnitQuaternion, Vector3};
 use num_traits::Zero;
-use stl_io::Vector;
 
 use super::decimal::Dec;
 
@@ -8,6 +7,12 @@ use super::decimal::Dec;
 pub struct Origin {
     pub center: Vector3<Dec>,
     pub rotation: UnitQuaternion<Dec>,
+}
+
+impl Default for Origin {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Origin {

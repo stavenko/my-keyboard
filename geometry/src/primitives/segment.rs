@@ -42,7 +42,7 @@ impl Segment {
         }
     }
 
-    pub(crate) fn flip(mut self) -> Self {
+    pub(crate) fn flip(self) -> Self {
         Self {
             from: self.to,
             to: self.from,

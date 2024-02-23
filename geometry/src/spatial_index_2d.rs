@@ -149,7 +149,7 @@ impl Index {
         ars
     }
 
-    pub fn new(mut points: Vec<Vector2<Dec>>) -> Self {
+    pub fn new(points: Vec<Vector2<Dec>>) -> Self {
         if points.is_empty() {
             Index::empty()
         } else if points.len() == 1 {

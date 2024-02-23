@@ -124,7 +124,7 @@ impl Splitter<Segment2D> for Line2D {
         let to = item.to - self.origin;
         let k_from = Self::kross(&self.dir, &from);
         let k_to = Self::kross(&self.dir, &to);
-        let k_to_dir = Self::kross(&self.dir, &ft);
+        let _k_to_dir = Self::kross(&self.dir, &ft);
         let loc = |k| {
             if k > eps {
                 Location::Front

@@ -15,7 +15,7 @@ pub struct Four;
 
 impl Four {
     pub fn parametric_face_iterator_t() -> impl Iterator<Item = [Vector2<Dec>; 3]> {
-        Segments::new(10).flat_map(|(t, tt)| {
+        Segments::new(5).flat_map(|(t, tt)| {
             Segments::new(1).flat_map(move |(s, ss)| {
                 let a = Vector2::new(t, s);
                 let b = Vector2::new(t, ss);
@@ -27,7 +27,7 @@ impl Four {
     }
     pub fn parametric_face_iterator_s() -> impl Iterator<Item = [Vector2<Dec>; 3]> {
         Segments::new(1).flat_map(|(t, tt)| {
-            Segments::new(10).flat_map(move |(s, ss)| {
+            Segments::new(5).flat_map(move |(s, ss)| {
                 let a = Vector2::new(t, s);
                 let b = Vector2::new(t, ss);
                 let c = Vector2::new(tt, s);
@@ -59,8 +59,8 @@ impl Topology for Four {
     type ParametricCoords = Vector2<Dec>;
 
     fn parametric_face_iterator() -> impl Iterator<Item = [Self::ParametricCoords; 3]> {
-        Segments::new(10).flat_map(|(t, tt)| {
-            Segments::new(10).flat_map(move |(s, ss)| {
+        Segments::new(5).flat_map(|(t, tt)| {
+            Segments::new(5).flat_map(move |(s, ss)| {
                 let a = Vector2::new(t, s);
                 let b = Vector2::new(t, ss);
                 let c = Vector2::new(tt, s);

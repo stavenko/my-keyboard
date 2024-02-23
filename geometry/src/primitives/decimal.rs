@@ -30,7 +30,7 @@ impl SubsetOf<Dec> for Dec {
         *element
     }
 
-    fn is_in_subset(element: &Dec) -> bool {
+    fn is_in_subset(_element: &Dec) -> bool {
         true
     }
 }
@@ -39,7 +39,7 @@ impl ComplexField for Dec {
     type RealField = Self;
 
     #[doc = r" Builds a pure-real complex number from the given value."]
-    fn from_real(re: Self::RealField) -> Self {
+    fn from_real(_re: Self::RealField) -> Self {
         todo!()
     }
 
@@ -74,7 +74,7 @@ impl ComplexField for Dec {
     }
 
     #[doc = r" Multiplies this complex number by `factor`."]
-    fn scale(self, factor: Self::RealField) -> Self {
+    fn scale(self, _factor: Self::RealField) -> Self {
         todo!()
     }
 
@@ -103,7 +103,7 @@ impl ComplexField for Dec {
         todo!()
     }
 
-    fn mul_add(self, a: Self, b: Self) -> Self {
+    fn mul_add(self, _a: Self, _b: Self) -> Self {
         todo!()
     }
 
@@ -115,7 +115,7 @@ impl ComplexField for Dec {
     }
 
     #[doc = r" Computes (self.conjugate() * self + other.conjugate() * other).sqrt()"]
-    fn hypot(self, other: Self) -> Self::RealField {
+    fn hypot(self, _other: Self) -> Self::RealField {
         todo!()
     }
 
@@ -180,7 +180,7 @@ impl ComplexField for Dec {
         todo!()
     }
 
-    fn log(self, base: Self::RealField) -> Self {
+    fn log(self, _base: Self::RealField) -> Self {
         todo!()
     }
 
@@ -217,15 +217,15 @@ impl ComplexField for Dec {
         todo!()
     }
 
-    fn powi(self, n: i32) -> Self {
+    fn powi(self, _n: i32) -> Self {
         todo!()
     }
 
-    fn powf(self, n: Self::RealField) -> Self {
+    fn powf(self, _n: Self::RealField) -> Self {
         todo!()
     }
 
-    fn powc(self, n: Self) -> Self {
+    fn powc(self, _n: Self) -> Self {
         todo!()
     }
 
@@ -251,7 +251,7 @@ impl RealField for Dec {
         self.0.is_negative()
     }
 
-    fn copysign(self, sign: Self) -> Self {
+    fn copysign(self, _sign: Self) -> Self {
         (self.0 / self.0.abs()).into()
     }
 
@@ -267,7 +267,7 @@ impl RealField for Dec {
         self.0.clamp(min.0, max.0).into()
     }
 
-    fn atan2(self, other: Self) -> Self {
+    fn atan2(self, _other: Self) -> Self {
         todo!()
     }
 
@@ -365,7 +365,7 @@ impl UlpsEq for Dec {
         Self::EPSILON.into()
     }
 
-    fn ulps_eq(&self, other: &Self, epsilon: Self::Epsilon, max_ulps: u32) -> bool {
+    fn ulps_eq(&self, other: &Self, _epsilon: Self::Epsilon, _max_ulps: u32) -> bool {
         self.0 == other.0
     }
 }
@@ -376,7 +376,7 @@ impl AbsDiffEq for Dec {
         Self::EPSILON
     }
 
-    fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
+    fn abs_diff_eq(&self, other: &Self, _epsilon: Self::Epsilon) -> bool {
         self.0 == other.0
     }
 }
@@ -389,8 +389,8 @@ impl approx::RelativeEq for Dec {
     fn relative_eq(
         &self,
         other: &Self,
-        epsilon: Self::Epsilon,
-        max_relative: Self::Epsilon,
+        _epsilon: Self::Epsilon,
+        _max_relative: Self::Epsilon,
     ) -> bool {
         self.0 == other.0
     }
@@ -425,15 +425,15 @@ impl SimdValue for Dec {
         *self
     }
 
-    unsafe fn extract_unchecked(&self, i: usize) -> Self::Element {
+    unsafe fn extract_unchecked(&self, _i: usize) -> Self::Element {
         *self
     }
 
-    fn replace(&mut self, i: usize, val: Self::Element) {
+    fn replace(&mut self, _i: usize, val: Self::Element) {
         *self = val
     }
 
-    unsafe fn replace_unchecked(&mut self, i: usize, val: Self::Element) {
+    unsafe fn replace_unchecked(&mut self, _i: usize, val: Self::Element) {
         *self = val
     }
 
@@ -478,7 +478,7 @@ impl Sum for Dec {
     }
 }
 impl Product for Dec {
-    fn product<I: Iterator<Item = Self>>(mut iter: I) -> Self {
+    fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
         let mut d = Self(Decimal::one());
         for i in iter {
             d *= i
@@ -498,38 +498,38 @@ impl From<f32> for Dec {
 }
 impl From<Dec> for i128 {
     fn from(value: Dec) -> Self {
-        let v = value.0.to_i128().unwrap_or_else(|| {
+        
+        value.0.to_i128().unwrap_or_else(|| {
             println!("WARNING: Cannot convert float f32 to decimal `{value}`, setting 0");
             0
-        });
-        v
+        })
     }
 }
 impl From<Dec> for u32 {
     fn from(value: Dec) -> Self {
-        let v = value.0.to_u32().unwrap_or_else(|| {
+        
+        value.0.to_u32().unwrap_or_else(|| {
             println!("WARNING: Cannot convert float u32 to decimal `{value}`, setting 0");
             0
-        });
-        v
+        })
     }
 }
 impl From<Dec> for f64 {
     fn from(value: Dec) -> Self {
-        let v = value.0.to_f64().unwrap_or_else(|| {
+        
+        value.0.to_f64().unwrap_or_else(|| {
             println!("WARNING: Cannot convert float f32 to decimal `{value}`, setting 0");
             0.0
-        });
-        v
+        })
     }
 }
 impl From<Dec> for f32 {
     fn from(value: Dec) -> Self {
-        let v = value.0.to_f32().unwrap_or_else(|| {
+        
+        value.0.to_f32().unwrap_or_else(|| {
             println!("WARNING: Cannot convert float f32 to decimal `{value}`, setting 0");
             0.0
-        });
-        v
+        })
     }
 }
 impl From<f64> for Dec {

@@ -185,9 +185,8 @@ impl KeyboardConfig {
     }
 
     pub fn build_total_wall(&self) -> Result<Mesh, anyhow::Error> {
-        let mut edge_items = self.edge_around().take(10).peekable();
+        let mut edge_items = self.edge_around().take(1).peekable();
         let mut mesh: Option<Mesh> = None;
-        // let mut corners = Vec::new();
         while let Some(surface_edge) = edge_items.next() {
             let base_plane = self.get_base_plane_projection(&surface_edge);
             let inner = SurfaceBetweenTwoEdgePaths::new(
@@ -283,8 +282,6 @@ impl KeyboardConfig {
                         Dec::one(),
                     );
                     let hull: Hull<Three> = (inner_bezier, outer_bezier).try_into()?;
-                    //faces.join(hull)?;
-                    // corners.push(hull.try_into()?);
                     if let Some(body) = mesh.take() {
                         match body.boolean_union(hull.try_into()?) {
                             Either::Left(result) => mesh = Some(result),
@@ -442,6 +439,7 @@ impl KeyboardConfig {
                 }
             })
     }
+
     fn main_bottom_edge(&self) -> impl Iterator<Item = HullEdgeItem<EdgeSegment>> + '_ {
         self.main_bottom_buttons()
             .sorted_by(sorted_along_vec(self.base.x()))

@@ -9,7 +9,7 @@ use crate::{
     },
 };
 
-use super::Hull;
+
 
 /// Generic hull between two surfaces.
 /// Expected, that surfaces have following properties:

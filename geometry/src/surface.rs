@@ -11,7 +11,7 @@ use self::topology::{Four, Topology};
 
 use super::{
     path::{bezier::BezierEdge, segment::EdgeSegment, Path},
-    primitives::{decimal::Dec, polygon::Polygon, Face},
+    primitives::{decimal::Dec, polygon::Polygon},
 };
 
 pub mod topology;
@@ -55,7 +55,7 @@ impl<P: Path, S: Path> Geometry for SurfaceBetweenTwoPaths<P, S, Four> {
         let faces = Four::parametric_face_iterator_s()
             .map(|pf| match pf.map(|p| self.get_point(p)) {
                 [Ok(a), Ok(b), Ok(c)] => Polygon::new(vec![a, b, c]),
-                err => Err(anyhow!("failed to create faces")),
+                _err => Err(anyhow!("failed to create faces")),
             })
             .try_collect::<_, Vec<_>, _>()?;
         Ok(faces)

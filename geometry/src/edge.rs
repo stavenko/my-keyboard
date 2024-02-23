@@ -1,18 +1,17 @@
 use core::fmt;
 
-use itertools::{Either, Itertools};
+use itertools::{Itertools};
 use nalgebra::{Vector2, Vector3};
 use stl_io::{Triangle, Vector};
 use tap::TapFallible;
 
 use crate::{
     primitives::{
-        basis,
         decimal::Dec,
         plane::Plane,
         polygon::Polygon,
         polygon_basis::PolygonBasis,
-        segment2d::{self, Segment2D},
+        segment2d::{Segment2D},
         Face,
     },
     spatial_index_2d::Index,
@@ -154,7 +153,7 @@ mod tests {
         },
     };
 
-    use super::Edge;
+    
 
     #[test]
     fn edge_creation() {
@@ -181,6 +180,6 @@ mod tests {
         .unwrap();
 
         let segments = dbg!(top.get_segments(&top_basis.get_polygon_basis()));
-        let bsp = Bsp::<Line2D, Segment2D>::build(segments).unwrap();
+        let _bsp = Bsp::<Line2D, Segment2D>::build(segments).unwrap();
     }
 }

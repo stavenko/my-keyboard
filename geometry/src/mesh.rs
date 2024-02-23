@@ -1,65 +1,11 @@
-use std::collections::VecDeque;
-
 use anyhow::anyhow;
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use stl_io::Triangle;
 use tap::TapFallible;
 
-use crate::{
-    bsp::Bsp,
-    edge::Edge,
-    primitives::{plane::Plane, segment::Segment},
-};
+use crate::{bsp::Bsp, edge::Edge, primitives::plane::Plane};
 
 use super::{hull::Hull, primitives::polygon::Polygon, surface::topology::Topology};
-
-pub struct MeshGraph {
-    polygon: Polygon,
-    missing: Vec<Segment>,
-    adjacent: Vec<MeshGraph>,
-}
-
-impl MeshGraph {
-    pub fn build_from_vec(polygons: &mut Vec<Polygon>) -> Self {
-        let polygon = polygons.pop().expect("non-empty");
-        let polygon_segments = polygon.get_segments_3d();
-        let mut graph = MeshGraph {
-            polygon,
-            missing: polygon_segments,
-            adjacent: Vec::new(),
-        };
-        graph.fill_adjacent(polygons);
-
-        graph
-    }
-
-    fn fill_adjacent(&mut self, polygons: &mut Vec<Polygon>) {
-        while let Some(segment) = self.missing.pop() {
-            if let Some(ix) = polygons
-                .iter()
-                .position(|p| p.has_opposite_segment(&segment))
-            {
-                let polygon = polygons.swap_remove(ix);
-                let missing = polygon.get_segments_3d();
-                let mut value = MeshGraph {
-                    polygon,
-                    missing,
-                    adjacent: Vec::new(),
-                };
-                value.fill_adjacent(polygons);
-                self.adjacent.push(value);
-            }
-        }
-    }
-
-    fn collect(self) -> Vec<Polygon> {
-        self.adjacent
-            .into_iter()
-            .flat_map(|f| f.collect())
-            .chain(vec![self.polygon])
-            .collect()
-    }
-}
 
 #[derive(Debug)]
 pub struct Mesh {
@@ -74,10 +20,6 @@ impl Mesh {
             match segments.iter().position(|segment| *segment == inv) {
                 None => joined.push(left),
                 Some(ix) => {
-                    dbg!("~~~remove ~~~");
-                    dbg!(inv);
-                    dbg!("~~~remove ~~~");
-
                     segments.swap_remove(ix);
                 }
             }
@@ -85,74 +27,82 @@ impl Mesh {
         joined
     }
 
-    pub fn boolean_union(self, other: Self) -> Either<Self, (Self, Self)> {
+    pub fn boolean_union(self, tool: Self) -> Self {
+        println!("union");
+        dbg!(self.polygons().len());
+        dbg!(tool.polygons().len());
         let my = Bsp::<Plane, Polygon>::build(self.polygons());
-        let other_bsp = Bsp::<Plane, Polygon>::build(other.polygons());
-        match (my, other_bsp) {
-            (None, None) => Either::Right((self, other)),
-            (None, Some(_)) => Either::Right((self, other)),
-            (Some(_), None) => Either::Right((self, other)),
-            (Some(my), Some(other_bsp)) => {
+        let tool_bsp = Bsp::<Plane, Polygon>::build(tool.polygons());
+
+        match (my, tool_bsp) {
+            (None, None) => self,
+            (None, Some(_)) => self,
+            (Some(_), None) => self,
+            (Some(my), Some(tool_bsp)) => {
                 let my_clipped = my.clip(self.polygons());
-                let my_clipped = other_bsp.clip(my_clipped);
+                let my_clipped = tool_bsp.clip(my_clipped);
 
-                let other_clipped = my.clip(other.polygons());
-                let other_clipped = other_bsp.clip(other_clipped);
+                dbg!("my clipped by both");
+                let tool_clipped = my.clip(tool.polygons());
+                let tool_clipped = tool_bsp.clip(tool_clipped);
+                dbg!("tool clipped by both");
 
-                let (front_my, back_my) = my.sort_front_back(other_clipped);
-                let (front_other, back_other) = other_bsp.sort_front_back(my_clipped);
+                let (front_my, back_my) = my.sort_front_back(tool_clipped);
+                let (front_tool, back_tool) = tool_bsp.sort_front_back(my_clipped);
+                dbg!("sorted");
 
                 let mut totals = back_my;
-                let dups = Polygon::polygon_union(front_my, front_other);
-                totals.extend(dups);
-                totals.extend(back_other);
+                dbg!(totals.len());
+                let union = Polygon::polygon_union(front_my, front_tool);
+                totals.extend(union);
+                totals.extend(back_tool);
                 let polygons = Self::remove_opposites(totals);
 
-                let (result, rest) = Self::from_polygons(polygons);
+                let (result, _rest) = Self::from_polygons(polygons);
 
-                Either::Left(result)
+                println!("union done");
+                result
             }
         }
     }
 
-    pub fn boolean_diff(self, other: Self) -> Option<Self> {
+    pub fn boolean_diff(self, tool: Self) -> Self {
         let my = Bsp::<Plane, Polygon>::build(self.polygons());
-        let other_bsp = Bsp::<Plane, Polygon>::build(other.polygons());
-        match (my, other_bsp) {
-            (None, None) => Some(self),
-            (None, Some(_)) => Some(self),
-            (Some(_), None) => Some(self),
-            (Some(my), Some(other_bsp)) => {
+        let tool_bsp = Bsp::<Plane, Polygon>::build(tool.polygons());
+        match (my, tool_bsp) {
+            (None, None) => self,
+            (None, Some(_)) => self,
+            (Some(_), None) => self,
+            (Some(my), Some(tool_bsp)) => {
                 let my_clipped = my.clip(self.polygons());
-                let my_clipped = other_bsp.clip(my_clipped);
+                let my_clipped = tool_bsp.clip(my_clipped);
 
-                let other_clipped = my.clip(other.polygons());
-                let other_clipped = other_bsp.clip(other_clipped);
+                let tool_clipped = my.clip(tool.polygons());
+                let tool_clipped = tool_bsp.clip(tool_clipped);
 
-                let (front_my, back_my) = my.sort_front_back(other_clipped);
-                let (front_other, back_other) = other_bsp.sort_front_back(my_clipped);
+                let (front_my, _back_my) = my.sort_front_back(tool_clipped);
+                let (_front_tool, back_tool) = tool_bsp.sort_front_back(my_clipped);
 
-                let mut totals = back_other;
+                let mut totals = back_tool;
                 totals.extend(front_my.into_iter().map(|f| f.flip()));
                 let polygons = Self::remove_opposites(totals);
                 if polygons.is_empty() {
-                    None
+                    self
                 } else {
-                    let (result, rest) = Self::from_polygons(polygons);
-
-                    Some(result)
+                    let (result, _rest) = Self::from_polygons(polygons);
+                    result
                 }
             }
         }
     }
-    pub fn boolean_intersecion(self, other: Self) -> Option<Self> {
-        todo!("implement boolean_intersecion")
-    }
+
     pub fn polygons(&self) -> Vec<Polygon> {
         self.sides.iter().flat_map(|s| s.polygons.clone()).collect()
     }
 
-    pub fn group_by_sides(polygons: Vec<Polygon>) -> Vec<Edge> {
+    pub fn group_by_sides(
+        polygons: impl IntoIterator<Item = Polygon>,
+    ) -> impl Iterator<Item = Edge> {
         let planes = polygons
             .into_iter()
             .map(|poly| (poly.get_plane(), poly))
@@ -169,26 +119,18 @@ impl Mesh {
                     acc
                 },
             );
-        planes
-            .into_iter()
-            .map(|(pl, ps)| Edge {
-                plane: pl,
-                polygons: ps,
-            })
-            .collect()
+
+        planes.into_iter().map(|(pl, ps)| Edge {
+            plane: pl,
+            polygons: ps,
+        })
     }
 
-    pub fn from_polygons(polygons: Vec<Polygon>) -> (Self, Vec<Polygon>) {
-        let sides = Self::group_by_sides(polygons);
-        let sides = sides
-            .into_iter()
-            .map(|s| {
-                println!("------------------********---------------------");
-                s.join_polygons_on_side()
-            })
+    pub fn from_polygons(polygons: impl IntoIterator<Item = Polygon>) -> (Self, Vec<Polygon>) {
+        let sides = Self::group_by_sides(polygons)
+            .map(|s| s.join_polygons_on_side())
             .collect_vec();
 
-        dbg!("merged");
         (Self { sides }, Vec::new())
     }
 }
@@ -246,16 +188,15 @@ where
     type Error = anyhow::Error;
 
     fn try_from(value: Hull<T>) -> Result<Self, Self::Error> {
-        let faces = value
+        let polygons = value
             .sides
             .into_iter()
             .flatten()
             .chain(value.outer)
             .chain(value.inner);
+        let (mesh, rest) = Mesh::from_polygons(polygons);
+        dbg!(rest);
 
-        let bsp = Bsp::<Plane, Polygon>::build(faces).ok_or(anyhow!("failed to build bsp tree"))?;
-        todo!("mesh creation");
-
-        //  Ok(Self(bsp))
+        Ok(mesh)
     }
 }

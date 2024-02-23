@@ -68,7 +68,7 @@ impl Splitter<Polygon> for Plane {
         item.get_plane()
     }
 
-    fn locate(&self, item: Polygon) -> Location {
+    fn locate(&self, _item: Polygon) -> Location {
         todo!()
     }
 }

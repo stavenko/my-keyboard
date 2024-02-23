@@ -1,7 +1,5 @@
+use rayon::prelude::*;
 use std::fmt;
-
-use itertools::Itertools;
-use nalgebra::Vector3;
 
 use crate::primitives::cutter::{SplitResult, Splitter};
 
@@ -34,13 +32,14 @@ impl<Cutter, Item> Bsp<Cutter, Item> {
 impl<Cutter, Item> Bsp<Cutter, Item>
 where
     Cutter: Splitter<Item>,
-    Cutter: Clone + fmt::Debug,
+    Cutter: Send + Sync + Clone + fmt::Debug,
     Cutter: Reversable,
-    Item: Clone + fmt::Debug,
+    Item: Send + Sync + Sized + Clone + fmt::Debug,
     Item: Reversable,
     Item: PartialEq,
     Item: 'static,
 {
+    /*
     fn new(cutter: Cutter) -> Self {
         Self {
             cutter,
@@ -51,7 +50,7 @@ where
         }
     }
 
-    pub fn merge(&mut self, other: impl IntoIterator<Item = Item>) {
+    fn merge(&mut self, other: impl IntoIterator<Item = Item>) {
         let (front, back, mut coplanar_front, mut coplanar_back) =
             other.into_iter().map(|f| self.cutter.split(f)).fold(
                 (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
@@ -81,6 +80,7 @@ where
         self.coplanar_back.append(&mut coplanar_back);
         self.coplanar_front.append(&mut coplanar_front);
     }
+    */
 
     pub fn build(polygon: impl IntoIterator<Item = Item>) -> Option<Self> {
         let mut iter = polygon.into_iter();
@@ -119,7 +119,7 @@ where
         })
     }
 
-    pub(crate) fn invert(mut self) -> Self {
+    pub fn invert(mut self) -> Self {
         let coplanar_back = self.coplanar_front.into_iter().map(|f| f.flip()).collect();
         let coplanar_front = self.coplanar_back.into_iter().map(|f| f.flip()).collect();
         self.coplanar_back = coplanar_back;
@@ -171,67 +171,30 @@ where
 
     pub fn clip(&self, items: Vec<Item>) -> Vec<Item> {
         let mut items = items
-            .into_iter()
-            .map(|segment| {
-                //dbg!(&segment);
-                self.cutter.split(segment)
-            })
-            .fold(Vec::new(), |(mut clipped), mut split| {
-                clipped.append(&mut split.front);
-                clipped.append(&mut split.back);
-                clipped.extend(split.coplanar_front);
-                clipped.extend(split.coplanar_back);
-                clipped
-            });
+            .into_par_iter()
+            .map(|segment| self.cutter.split(segment))
+            .fold(
+                || Vec::new(),
+                |mut clipped, mut split| {
+                    clipped.append(&mut split.front);
+                    clipped.append(&mut split.back);
+                    clipped.extend(split.coplanar_front);
+                    clipped.extend(split.coplanar_back);
+                    clipped
+                },
+            )
+            .flatten()
+            .collect();
 
         if let Some(tree) = self.front.as_ref() {
             items = tree.clip(items);
-            //println!("no_front_tree");
         }
 
         if let Some(tree) = self.back.as_ref() {
             items = tree.clip(items);
-        } else {
-            //println!("no_back_tree");
         }
         items
     }
-
-    /*
-    fn clip_segments_by_front_back(&self, lines: Vec<Item>) -> (Vec<Item>, Vec<Item>) {
-        let (front, back) = lines
-            .into_iter()
-            .map(|segment| self.cutter.split(segment))
-            .fold(
-                (Vec::new(), Vec::new()),
-                |(mut front, mut back), mut split| {
-                    front.append(&mut split.front);
-                    back.append(&mut split.back);
-                    front.extend(split.coplanar_front);
-                    back.extend(split.coplanar_back);
-                    (front, back)
-                },
-            );
-
-        let mut split_result = SplitResult::default();
-
-        if let Some(tree) = self.front.as_ref() {
-            let (f, b) = tree.clip_segments_by_front_back(front);
-            split_result = split_result.fronts(f).backs(b)
-        } else {
-            println!("no_front_tree");
-            split_result = split_result.fronts(front)
-        }
-        if let Some(tree) = self.back.as_ref() {
-            let (f, b) = tree.clip_segments_by_front_back(back);
-            split_result = split_result.fronts(f).backs(b)
-        } else {
-            println!("no_back_tree");
-            split_result = split_result.backs(back)
-        }
-        (split_result.front, split_result.back)
-    }
-    */
 }
 
 pub struct ItemsBspIterator<I, Item>
@@ -265,6 +228,7 @@ where
 
     type IntoIter = ItemsBspIterator<Box<dyn Iterator<Item = Item>>, Item>;
 
+    #[allow(clippy::useless_conversion)]
     fn into_iter(self) -> Self::IntoIter {
         let len = self.items_amount();
         let mut my: Box<dyn Iterator<Item = Item>> =
@@ -289,23 +253,16 @@ mod tests {
 
     use assert_matches::assert_matches;
     use itertools::{Either, Itertools};
-    use nalgebra::{Vector2, Vector3};
-    use num_traits::{One, Zero};
+    use nalgebra::Vector3;
+    use num_traits::One;
     use rust_decimal_macros::dec;
 
     use crate::{
         //bsp::bsp2::{self, Bsp},
         bsp::Bsp,
-        mesh::Mesh,
         primitives::{
-            basis::Basis,
-            cutter::{SplitResult, Splitter},
-            decimal::Dec,
-            line2d::Line2D,
-            plane::Plane,
-            polygon::{self, Polygon},
-            polygon_basis::PolygonBasis,
-            segment2d::Segment2D,
+            basis::Basis, cutter::Splitter, decimal::Dec, line2d::Line2D, polygon::Polygon,
+            polygon_basis::PolygonBasis, segment2d::Segment2D,
         },
         shapes::rect,
     };
@@ -372,7 +329,7 @@ mod tests {
             Vector3::new(dec!(-1).into(), dec!(-1).into(), dec!(0).into()),
             Vector3::new(dec!(-1).into(), dec!(1).into(), dec!(0).into()),
         ];
-        let basis = PolygonBasis {
+        let _basis = PolygonBasis {
             center: Vector3::zeros(),
             x: Vector3::x(),
             y: Vector3::y(),
@@ -405,50 +362,6 @@ mod tests {
     }
 
     #[test]
-    fn boolean_diff_2() {
-        let points = [
-            Vector3::new(dec!(1).into(), dec!(1).into(), dec!(0).into()),
-            Vector3::new(dec!(1).into(), dec!(-1).into(), dec!(0).into()),
-            Vector3::new(dec!(-1).into(), dec!(-1).into(), dec!(0).into()),
-            Vector3::new(dec!(-1).into(), dec!(1).into(), dec!(0).into()),
-        ];
-        let basis = PolygonBasis {
-            center: Vector3::zeros(),
-            x: Vector3::x(),
-            y: Vector3::y(),
-        };
-        let poly = Polygon::new(points.to_vec()).unwrap();
-        let bsp_2d_one = Bsp::<Line2D, Segment2D>::build(poly.get_segments(&basis)).unwrap();
-
-        let points = [
-            Vector3::new(dec!(1).into(), dec!(1).into(), dec!(0).into()),
-            Vector3::new(dec!(2).into(), dec!(1).into(), dec!(0).into()),
-            Vector3::new(dec!(2).into(), dec!(-1).into(), dec!(0).into()),
-            Vector3::new(dec!(1).into(), dec!(-1).into(), dec!(0).into()),
-        ];
-        let poly = Polygon::new(points.to_vec()).unwrap();
-        let bsp_2d_two = Bsp::<Line2D, Segment2D>::build(poly.get_segments(&basis)).unwrap();
-
-        let segments = [Segment2D {
-            from: Vector2::new(Dec::from(dec!(-0.7)), Dec::from(dec!(-0.7))),
-            to: Vector2::new(Dec::from(dec!(-0.2)), Dec::from(dec!(0.6))),
-        }];
-
-        let result = diff(bsp_2d_one, bsp_2d_two);
-        let lines = dbg!(result.into_iter().collect_vec());
-        dbg!(lines.len());
-        let polygons = Polygon::from_segments(lines, &basis).unwrap();
-        assert_eq!(polygons.len(), 1);
-        let vv: Vec<Vector3<Dec>> = vec![
-            Vector3::new(dec!(1).into(), dec!(1).into(), dec!(0).into()),
-            Vector3::new(dec!(1).into(), dec!(-1).into(), dec!(0).into()),
-            Vector3::new(dec!(-1).into(), dec!(-1).into(), dec!(0).into()),
-            Vector3::new(dec!(-1).into(), dec!(1).into(), dec!(0).into()),
-        ];
-        assert_eq!(polygons[0].vertices, vv);
-    }
-
-    #[test]
     fn boolean_union_2() {
         let points = [
             Vector3::new(dec!(1).into(), dec!(1).into(), dec!(0).into()),
@@ -472,11 +385,6 @@ mod tests {
         ];
         let poly = Polygon::new(points.to_vec()).unwrap();
         let bsp_2d_two = Bsp::<Line2D, Segment2D>::build(poly.get_segments(&basis)).unwrap();
-
-        let segments = [Segment2D {
-            from: Vector2::new(Dec::from(dec!(-0.7)), Dec::from(dec!(-0.7))),
-            to: Vector2::new(Dec::from(dec!(-0.2)), Dec::from(dec!(0.6))),
-        }];
 
         let lines = union(bsp_2d_one, bsp_2d_two).into_iter().collect_vec();
         dbg!(lines.len());
@@ -509,7 +417,7 @@ mod tests {
             Vector3::new(dec!(4).into(), dec!(1).into(), dec!(0).into()),
             Vector3::new(dec!(1).into(), dec!(1).into(), dec!(0).into()),
         ];
-        let basis = PolygonBasis {
+        let _basis = PolygonBasis {
             center: Vector3::zeros(),
             x: Vector3::x(),
             y: Vector3::y(),
@@ -550,7 +458,7 @@ mod tests {
             Vector3::new(dec!(-4).into(), dec!(-1).into(), dec!(0).into()),
             Vector3::new(dec!(-4).into(), dec!(-4).into(), dec!(0).into()),
         ];
-        let basis = PolygonBasis {
+        let _basis = PolygonBasis {
             center: Vector3::zeros(),
             x: Vector3::x(),
             y: Vector3::y(),
@@ -592,9 +500,8 @@ mod tests {
         let cube_bigger = rect(z, Dec::one() * 2, Dec::one() * 2, Dec::one() * 2);
 
         let result = cube_bigger.boolean_union(cube_smaller);
-        let mesh = assert_matches!(result, Either::Left(p) => p);
 
-        assert_eq!(mesh.sides.len(), 6);
+        assert_eq!(result.sides.len(), 6);
     }
 
     pub fn union<S, I>(right: Bsp<S, I>, other: Bsp<S, I>) -> Vec<I>
@@ -610,12 +517,6 @@ mod tests {
 
         let (_front2, mut back2) = right.sort_front_back(total_segments);
 
-        dbg!(&_front1);
-        dbg!(&back1);
-
-        dbg!(&_front2);
-        dbg!(&back2);
-
         let mut joined = Vec::new();
         for s in back1.into_iter() {
             let inv = s.clone().flip();
@@ -629,84 +530,4 @@ mod tests {
 
         joined
     }
-
-    pub fn diff<S: Splitter<I> + Clone, I: Clone>(right: Bsp<S, I>, other: Bsp<S, I>) -> Vec<I> {
-        todo!()
-    }
-    /*
-        #[test]
-        fn cut_polygon_with_cube() {
-            let z = PolygonBasis {
-                x: Vector3::x(),
-                y: Vector3::y(),
-                z: Vector3::z(),
-                center: Vector3::zeros(),
-            };
-
-            let cube_bigger = rect(z.clone(), Dec::one() * 2, Dec::one() * 2, Dec::one() * 2);
-
-            let polygon = polygon::Polygon::new(
-                vec![
-                    Vector3::new(-Dec::one() * 4, Dec::one() * 4, Dec::zero()),
-                    Vector3::new(-Dec::one() * 4, -Dec::one() * 4, Dec::zero()),
-                    Vector3::new(Dec::one() * 4, -Dec::one() * 4, Dec::zero()),
-                    Vector3::new(Dec::one() * 4, Dec::one() * 4, Dec::zero()),
-                ],
-                z,
-            );
-
-            let bsp = Bsp::<Plane, Polygon>::build(cube_bigger.polygons()).unwrap();
-            let (inside, outside) = bsp.clip_segments_by_front_back(vec![polygon]);
-            assert_eq!(inside.len(), 1);
-            assert_eq!(
-                inside[0].vertices,
-                vec![
-                    Vector3::new(-Dec::one(), -Dec::one(), Dec::zero()),
-                    Vector3::new(Dec::one(), -Dec::one(), Dec::zero()),
-                    Vector3::new(Dec::one(), Dec::one(), Dec::zero()),
-                    Vector3::new(-Dec::one(), Dec::one(), Dec::zero()),
-                ]
-            );
-            assert_eq!(outside.len(), 4);
-            assert_eq!(
-                outside[0].vertices,
-                vec![
-                    Vector3::new(Dec::one(), -Dec::one(), Dec::zero()),
-                    Vector3::new(Dec::one() * 4, -Dec::one(), Dec::zero()),
-                    Vector3::new(Dec::one() * 4, Dec::one(), Dec::zero()),
-                    Vector3::new(Dec::one(), Dec::one(), Dec::zero()),
-                ]
-            );
-            assert_eq!(
-                outside[1].vertices,
-                vec![
-                    Vector3::new(-Dec::one() * 4, Dec::one(), Dec::zero()),
-                    Vector3::new(-Dec::one() * 4, -Dec::one(), Dec::zero()),
-                    Vector3::new(-Dec::one(), -Dec::one(), Dec::zero()),
-                    Vector3::new(-Dec::one(), Dec::one(), Dec::zero()),
-                ]
-            );
-            assert_eq!(
-                outside[2].vertices,
-                vec![
-                    Vector3::new(-Dec::one() * 4, -Dec::one(), Dec::zero()),
-                    Vector3::new(-Dec::one() * 4, -Dec::one() * 4, Dec::zero()),
-                    Vector3::new(Dec::one() * 4, -Dec::one() * 4, Dec::zero()),
-                    Vector3::new(Dec::one() * 4, -Dec::one(), Dec::zero()),
-                ]
-            );
-            assert_eq!(
-                outside[3].vertices,
-                vec![
-                    Vector3::new(-Dec::one() * 4, Dec::one() * 4, Dec::zero()),
-                    Vector3::new(-Dec::one() * 4, Dec::one(), Dec::zero()),
-                    Vector3::new(Dec::one() * 4, Dec::one(), Dec::zero()),
-                    Vector3::new(Dec::one() * 4, Dec::one() * 4, Dec::zero()),
-                ]
-            );
-
-            let ps = Mesh::join_polygons_on_side(outside);
-            assert_eq!(ps.len(), 2);
-        }
-    */
 }

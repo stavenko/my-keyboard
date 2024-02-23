@@ -426,6 +426,13 @@ checksum = "b1a46d1a171d865aa5f83f92695765caa047a9b4cbae2cbf37dbd613a793fd4c"
 name = "keyboard"
 version = "0.1.0"
 dependencies = [
+ "geometry",
+]
+
+[[package]]
+name = "keyboard-first"
+version = "0.1.0"
+dependencies = [
  "anyhow",
  "geometry",
  "itertools",

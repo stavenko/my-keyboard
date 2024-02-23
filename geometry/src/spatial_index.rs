@@ -1,5 +1,5 @@
 use nalgebra::Vector3;
-use num_traits::One;
+
 
 use super::primitives::decimal::Dec;
 
@@ -152,7 +152,7 @@ impl Index {
         ars
     }
 
-    pub fn new(mut points: Vec<Vector3<Dec>>) -> Self {
+    pub fn new(points: Vec<Vector3<Dec>>) -> Self {
         let sum: Vector3<Dec> = points.iter().sum();
         let avg: Vector3<Dec> = sum / Dec::from(points.len());
 
@@ -192,7 +192,7 @@ mod test {
 
     use assert_matches::assert_matches;
     use nalgebra::Vector3;
-    use num_traits::Zero;
+    
 
     use crate::{primitives::decimal::Dec, spatial_index::Index};
 

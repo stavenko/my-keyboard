@@ -6,12 +6,10 @@ use stl_io::{Triangle, Vector};
 
 use self::{decimal::Dec, plane::Plane};
 
-pub mod basis;
 pub mod cutter;
 pub mod decimal;
 pub mod line;
 pub mod line2d;
-pub mod origin;
 pub mod plane;
 pub mod polygon;
 pub mod polygon_basis;
@@ -71,7 +69,7 @@ impl Face {
 
     pub fn new(vertices: [Vector3<Dec>; 3]) -> Self {
         let [u, v, w] = &vertices;
-        let origin = *u;
+        let _origin = *u;
         let a = v - u;
         let b = w - u;
 
@@ -85,7 +83,7 @@ impl Face {
     }
 
     pub fn get_plane(&self) -> Plane {
-        let [u, v, w] = &self.vertices;
+        let [u, _v, _w] = &self.vertices;
         let origin = *u;
         Plane::new_from_normal_and_point(self.normal, origin)
     }
@@ -136,6 +134,12 @@ impl<const D: usize> Iterator for IndexIterator<D> {
         } else {
             None
         }
+    }
+}
+
+impl<const D: usize> Default for IndexIterator<D> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

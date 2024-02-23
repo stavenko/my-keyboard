@@ -9,9 +9,7 @@ use geometry::{
     shapes,
 };
 use nalgebra::Vector3;
-use num_traits::{One, Zero};
-use rust_decimal_macros::dec;
-use stl_io::Vector;
+use num_traits::One;
 
 #[derive(Parser)]
 pub struct Command {
@@ -35,12 +33,7 @@ fn bigger_by_smaller(file_root: PathBuf) -> anyhow::Result<()> {
 
     let bigger_box = shapes::rect(_zero_basis, Dec::one() * 2, Dec::one() * 2, Dec::one() * 2);
 
-    let result = match bigger_box.boolean_union(smaller_box) {
-        itertools::Either::Left(joined) => joined,
-        itertools::Either::Right(_) => {
-            panic!("join didn't happend");
-        }
-    };
+    let result = bigger_box.boolean_union(smaller_box);
 
     let mut writer = OpenOptions::new()
         .write(true)
@@ -76,12 +69,7 @@ fn two_identical_boxes_one_with_the_other_overlap(file_root: PathBuf) -> anyhow:
         Dec::one() * Dec::from(1.),
     );
 
-    let result = match box_one.boolean_union(box_two) {
-        itertools::Either::Left(joined) => joined,
-        itertools::Either::Right(_) => {
-            panic!("join didn't happend");
-        }
-    };
+    let result = box_one.boolean_union(box_two);
 
     let mut writer = OpenOptions::new()
         .write(true)
@@ -117,12 +105,7 @@ fn two_identical_boxes_one_with_the_other(file_root: PathBuf) -> anyhow::Result<
         Dec::one() * Dec::from(1.),
     );
 
-    let result = match box_one.boolean_union(box_two) {
-        itertools::Either::Left(joined) => joined,
-        itertools::Either::Right(_) => {
-            panic!("join didn't happend");
-        }
-    };
+    let result = box_one.boolean_union(box_two);
 
     let mut writer = OpenOptions::new()
         .write(true)
@@ -158,12 +141,7 @@ fn two_identical_boxes_one_shifted_in_plane(file_root: PathBuf) -> anyhow::Resul
         Dec::one() * Dec::from(1.),
     );
 
-    let result = match box_one.boolean_union(box_two) {
-        itertools::Either::Left(joined) => joined,
-        itertools::Either::Right(_) => {
-            panic!("join didn't happend");
-        }
-    };
+    let result = box_one.boolean_union(box_two);
 
     let mut writer = OpenOptions::new()
         .write(true)
@@ -201,12 +179,7 @@ fn two_identical_boxes_one_shifted_in_space(file_root: PathBuf) -> anyhow::Resul
         Dec::one() * Dec::from(1.),
     );
 
-    let result = match box_one.boolean_union(box_two) {
-        itertools::Either::Left(joined) => joined,
-        itertools::Either::Right(_) => {
-            panic!("join didn't happend");
-        }
-    };
+    let result = box_one.boolean_union(box_two);
 
     let mut writer = OpenOptions::new()
         .write(true)
@@ -243,12 +216,7 @@ fn bigger_box_extended_by_smaller(file_root: PathBuf) -> anyhow::Result<()> {
         Dec::one() * Dec::from(0.5),
     );
 
-    let result = match box_one.boolean_union(box_two) {
-        itertools::Either::Left(joined) => joined,
-        itertools::Either::Right(_) => {
-            panic!("join didn't happend");
-        }
-    };
+    let result = box_one.boolean_union(box_two);
 
     let mut writer = OpenOptions::new()
         .write(true)
@@ -283,12 +251,7 @@ fn bigger_box_extended_by_longer(file_root: PathBuf) -> anyhow::Result<()> {
         Dec::one() * Dec::from(0.5),
     );
 
-    let result = match box_one.boolean_union(box_two) {
-        itertools::Either::Left(joined) => joined,
-        itertools::Either::Right(_) => {
-            panic!("join didn't happend");
-        }
-    };
+    let result = box_one.boolean_union(box_two);
 
     let mut writer = OpenOptions::new()
         .write(true)
@@ -323,12 +286,7 @@ fn smaller_box_cutted_by_bigger(file_root: PathBuf) -> anyhow::Result<()> {
         Dec::one() * Dec::from(0.5),
     );
 
-    let result = match box_one.boolean_diff(box_two) {
-        Some(joined) => joined,
-        None => {
-            panic!("join didn't happend");
-        }
-    };
+    let result = box_one.boolean_diff(box_two);
 
     let mut writer = OpenOptions::new()
         .write(true)
@@ -363,12 +321,7 @@ fn smaller_box_cutted_by_longer(file_root: PathBuf) -> anyhow::Result<()> {
         Dec::one() * Dec::from(3.0),
     );
 
-    let result = match box_one.boolean_diff(box_two) {
-        Some(joined) => joined,
-        None => {
-            panic!("join didn't happend");
-        }
-    };
+    let result = box_one.boolean_diff(box_two);
 
     let mut writer = OpenOptions::new()
         .write(true)
@@ -403,12 +356,7 @@ fn smaller_box_cutted_by_bigger_in_two(file_root: PathBuf) -> anyhow::Result<()>
         Dec::one() * Dec::from(0.5),
     );
 
-    let result = match box_one.boolean_diff(box_two) {
-        Some(joined) => joined,
-        None => {
-            panic!("join didn't happend");
-        }
-    };
+    let result = box_one.boolean_diff(box_two);
 
     let mut writer = OpenOptions::new()
         .write(true)
@@ -425,13 +373,13 @@ fn main() -> Result<(), anyhow::Error> {
     let cli = Command::parse();
 
     fs::create_dir_all(cli.output_path.clone())?;
-    //bigger_by_smaller(cli.output_path.clone())?;
-    //two_identical_boxes_one_with_the_other_overlap(cli.output_path.clone())?;
-    //two_identical_boxes_one_with_the_other(cli.output_path.clone())?;
-    //two_identical_boxes_one_shifted_in_plane(cli.output_path.clone())?;
-    //two_identical_boxes_one_shifted_in_space(cli.output_path.clone())?;
-    //bigger_box_extended_by_smaller(cli.output_path.clone())?;
-    //bigger_box_extended_by_longer(cli.output_path.clone())?;
+    bigger_by_smaller(cli.output_path.clone())?;
+    two_identical_boxes_one_with_the_other_overlap(cli.output_path.clone())?;
+    two_identical_boxes_one_with_the_other(cli.output_path.clone())?;
+    two_identical_boxes_one_shifted_in_plane(cli.output_path.clone())?;
+    two_identical_boxes_one_shifted_in_space(cli.output_path.clone())?;
+    bigger_box_extended_by_smaller(cli.output_path.clone())?;
+    bigger_box_extended_by_longer(cli.output_path.clone())?;
 
     smaller_box_cutted_by_bigger(cli.output_path.clone())?;
     smaller_box_cutted_by_bigger_in_two(cli.output_path.clone())?;

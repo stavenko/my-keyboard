@@ -31,7 +31,7 @@ impl PartialEq for Segment2D {
 }
 
 impl Reversable for Segment2D {
-    fn flip(mut self) -> Self {
+    fn flip(self) -> Self {
         Self {
             from: self.to,
             to: self.from,
@@ -60,7 +60,6 @@ impl Segment2D {
             match segments.iter().position(|segment| *segment == inv) {
                 None => joined.push(left),
                 Some(ix) => {
-                    dbg!("wtf", inv);
                     segments.swap_remove(ix);
                 }
             }
@@ -134,8 +133,6 @@ mod tests {
     use rust_decimal_macros::dec;
 
     use crate::primitives::segment2d::Segment2D;
-
-    use super::Line2D;
 
     #[test]
     fn join_segment_1() {
