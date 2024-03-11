@@ -1,10 +1,11 @@
 use std::iter::empty;
 
-use geometry::primitives::origin::Origin;
+use geometry::origin::Origin;
 
 use super::{button::Button, ButtonsColumn};
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct ButtonsCollection {
     thickness: f32,
     pub origin: Origin,
@@ -88,12 +89,12 @@ impl ButtonsCollection {
             last_column_ix: 0,
         }
     }
-    pub(crate) fn left_column(&self) -> Option<&ButtonsColumn> {
-        self.columns.get(0)
+    pub fn left_column(&self) -> Option<&ButtonsColumn> {
+        self.columns.first()
     }
-    pub(crate) fn right_column(&self) -> Option<&ButtonsColumn> {
-        if self.columns.len() > 0 {
-            self.columns.get(self.columns.len() - 1)
+    pub fn right_column(&self) -> Option<&ButtonsColumn> {
+        if !self.columns.is_empty() {
+            self.columns.last()
         } else {
             None
         }

@@ -3,7 +3,7 @@ use core::fmt;
 use nalgebra::Vector2;
 use rust_decimal_macros::dec;
 
-use crate::bsp::Reversable;
+use crate::{bsp::Reversable, cutter::ItemLocation, intersects::Intersects};
 
 use super::{
     cutter::{Location, SplitResult, Splitter},
@@ -29,8 +29,15 @@ impl fmt::Debug for Line2D {
         )
     }
 }
+impl Intersects<Line2D> for Line2D {
+    type Out = Vector2<Dec>;
 
-impl Splitter<Segment2D> for Line2D {
+    fn intersects(&self, other: &Line2D) -> Option<Self::Out> {
+        todo!("Implemenet two lines intersection");
+    }
+}
+
+impl Splitter<Segment2D, Vector2<Dec>> for Line2D {
     fn split(&self, segment: Segment2D) -> super::cutter::SplitResult<Segment2D> {
         let eps: Dec = dec!(1e-12).into();
         let ft = segment.dir();
@@ -113,11 +120,7 @@ impl Splitter<Segment2D> for Line2D {
         }
     }
 
-    fn from_item(item: &Segment2D) -> Self {
-        item.get_line()
-    }
-
-    fn locate(&self, item: Segment2D) -> Location {
+    fn locate(&self, item: &Segment2D) -> ItemLocation {
         let eps: Dec = dec!(1e-12).into();
         let ft = item.dir();
         let from = item.from - self.origin;
@@ -135,17 +138,23 @@ impl Splitter<Segment2D> for Line2D {
             }
         };
         match (loc(k_from), loc(k_to)) {
-            (Location::Front, Location::Front) => Location::Front,
-            (Location::Back, Location::Back) => Location::Back,
-            (Location::Front, Location::Coplanar) => Location::Front,
-            (Location::Back, Location::Coplanar) => Location::Back,
-            (Location::Coplanar, Location::Front) => Location::Front,
-            (Location::Coplanar, Location::Back) => Location::Back,
-
-            _ => unimplemented!(
-                "locate expects only one side segments. clip before calling this function"
-            ),
+            (Location::Front, Location::Front) => ItemLocation::Front,
+            (Location::Back, Location::Back) => ItemLocation::Back,
+            (Location::Front, Location::Coplanar) => ItemLocation::Front,
+            (Location::Back, Location::Coplanar) => ItemLocation::Back,
+            (Location::Coplanar, Location::Front) => ItemLocation::Front,
+            (Location::Coplanar, Location::Back) => ItemLocation::Back,
+            (Location::Front, Location::Back) => ItemLocation::Split,
+            (Location::Back, Location::Front) => ItemLocation::Split,
+            (Location::Coplanar, Location::Coplanar) => ItemLocation::Co,
         }
+    }
+    fn from_item(item: &Segment2D) -> Self {
+        item.get_line()
+    }
+
+    fn locate_vertex(&self, vertex: &Vector2<Dec>) -> crate::cutter::VertexLocation {
+        todo!()
     }
 }
 
@@ -223,7 +232,7 @@ mod tests {
     use nalgebra::Vector2;
     use rust_decimal_macros::dec;
 
-    use crate::primitives::{cutter::Splitter, segment2d::Segment2D};
+    use crate::{cutter::Splitter, segment2d::Segment2D};
 
     use super::Line2D;
 

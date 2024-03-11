@@ -1,7 +1,6 @@
 use nalgebra::Vector3;
 
-
-use super::primitives::decimal::Dec;
+use super::decimal::Dec;
 
 #[derive(Debug)]
 pub enum IndexContents {
@@ -25,7 +24,7 @@ impl Default for Index {
 }
 
 impl Index {
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         matches!(self.contents, IndexContents::Empty)
     }
 
@@ -44,7 +43,7 @@ impl Index {
         }
     }
 
-    pub fn insert(&mut self, p: Vector3<Dec>, deep: usize) {
+    pub fn insert(&mut self, p: Vector3<Dec>) {
         match &mut self.contents {
             IndexContents::Empty => {
                 self.contents = IndexContents::Single(p);
@@ -60,7 +59,7 @@ impl Index {
             IndexContents::Quadrants(quadrants) => {
                 let ix = Self::index(&self.middle, &p);
 
-                quadrants[ix].insert(p, deep + 1);
+                quadrants[ix].insert(p);
             }
         }
 
@@ -90,6 +89,7 @@ impl Index {
             IndexContents::Quadrants(ref qs) => qs.iter().flat_map(|q| q.get_vec()).collect(),
         }
     }
+
     pub fn linearize(self) -> Vec<Vector3<Dec>> {
         match self.contents {
             IndexContents::Empty => Vec::new(),
@@ -192,9 +192,8 @@ mod test {
 
     use assert_matches::assert_matches;
     use nalgebra::Vector3;
-    
 
-    use crate::{primitives::decimal::Dec, spatial_index::Index};
+    use crate::{decimal::Dec, spatial_index::Index};
 
     use super::IndexContents;
 
@@ -245,7 +244,7 @@ mod test {
             Vector3::new(Dec::from(-499), Dec::from(-499), Dec::from(-499)),
         );
         for t in &items {
-            ix.insert(*t, 0);
+            ix.insert(*t);
         }
 
         let qs = assert_matches!(&ix.contents, IndexContents::Quadrants(qs) => qs);

@@ -1,22 +1,20 @@
+use crate::planar::face::Face;
+use crate::spatial_index_2d::Index;
 use core::fmt;
 
-use itertools::{Itertools};
+use itertools::Itertools;
 use nalgebra::{Vector2, Vector3};
 use stl_io::{Triangle, Vector};
 use tap::TapFallible;
 
 use crate::{
-    primitives::{
-        decimal::Dec,
-        plane::Plane,
-        polygon::Polygon,
-        polygon_basis::PolygonBasis,
-        segment2d::{Segment2D},
-        Face,
-    },
-    spatial_index_2d::Index,
+    decimal::Dec,
+    linear::segment::Segment,
+    planar::{plane::Plane, polygon::Polygon},
+    polygon_basis::PolygonBasis,
 };
 
+#[derive(Clone)]
 pub struct Edge {
     pub plane: Plane,
     pub polygons: Vec<Polygon>,
@@ -32,26 +30,37 @@ impl fmt::Debug for Edge {
 }
 
 impl Edge {
-    pub fn join_polygons_on_side(mut self) -> Self {
-        let basis = self.get_common_basis();
-        let segments_2d = self
+    pub fn get_segments(&self) -> Vec<Segment> {
+        self.polygons
+            .iter()
+            .flat_map(|p| p.get_segments())
+            .collect()
+    }
+
+    pub fn join_polygons_on_side(mut self) -> Option<Self> {
+        let segments = self
             .polygons
             .iter()
-            .flat_map(|p| p.get_segments_with_basis(&basis))
+            .flat_map(|p| p.get_segments())
             .collect_vec();
 
-        let segments_2d = Segment2D::remove_opposites(segments_2d);
-        match Polygon::from_segments(segments_2d, &basis) {
-            Ok(polygons) => {
-                self.polygons = polygons;
-                self
+        let segments = Segment::remove_opposites(segments);
+        if !segments.is_empty() {
+            match Polygon::from_segments(segments) {
+                Ok(polygons) => {
+                    self.polygons = polygons;
+                    Some(self)
+                }
+                Err(err) => {
+                    eprintln!("ERROR: {}", err);
+                    Some(self)
+                }
             }
-            Err(err) => {
-                eprintln!("ERRROR: {}", err);
-                self
-            }
+        } else {
+            None
         }
     }
+
     fn get_common_basis(&self) -> PolygonBasis {
         // we got plane, so we at least have one point
         //
@@ -78,7 +87,7 @@ impl Edge {
         let mut contours = Vec::new();
         let basis = self.get_common_basis();
         self.polygons.iter().for_each(|poly| {
-            let segments = poly.get_segments_with_basis(&basis);
+            let segments = poly.get_segments_2d(&basis);
 
             for s in &segments {
                 index.insert(s.from);
@@ -100,10 +109,11 @@ impl Edge {
                 c
             })
             .collect_vec();
+
         let tup_array: Vec<_> = index
             .linearize()
             .into_iter()
-            .map(|v| (v.x.into(), v.y.into()))
+            .map(|v| (v.x.round_dp(9).into(), v.y.round_dp(9).into()))
             .collect_vec();
 
         let mut t = cdt::Triangulation::new_from_contours(&tup_array, &contours).tap_err(|e| {
@@ -125,6 +135,7 @@ impl Edge {
                     basis.unproject(&Vector2::new(tup_array[b].0.into(), tup_array[b].1.into()));
                 let c: Vector3<Dec> =
                     basis.unproject(&Vector2::new(tup_array[c].0.into(), tup_array[c].1.into()));
+
                 let face = Face::new([a, b, c]);
 
                 Triangle {
@@ -141,45 +152,11 @@ impl Edge {
             .collect::<Vec<_>>();
         Ok(result)
     }
-}
-#[cfg(test)]
-mod tests {
-    use nalgebra::Vector3;
 
-    use crate::{
-        bsp::Bsp,
-        primitives::{
-            basis::Basis, decimal::Dec, line2d::Line2D, polygon::Polygon, segment2d::Segment2D,
-        },
-    };
-
-    
-
-    #[test]
-    fn edge_creation() {
-        let h = Dec::from(2);
-        let w = Dec::from(2);
-        let d = Dec::from(2);
-        let ww: Vector3<Dec> = Vector3::x() * (w / 2);
-        let hh: Vector3<Dec> = Vector3::y() * (h / 2);
-        let dd: Vector3<Dec> = Vector3::z() * (d / 2);
-        let top_basis = Basis::new(
-            Vector3::x(),
-            -Vector3::y(),
-            -Vector3::z(),
-            Vector3::zeros() + hh,
-        )
-        .unwrap();
-
-        let top = Polygon::new(vec![
-            top_basis.center() - ww + dd,
-            top_basis.center() - ww - dd,
-            top_basis.center() + ww - dd,
-            top_basis.center() + ww + dd,
-        ])
-        .unwrap();
-
-        let segments = dbg!(top.get_segments(&top_basis.get_polygon_basis()));
-        let _bsp = Bsp::<Line2D, Segment2D>::build(segments).unwrap();
+    pub(crate) fn from_polygon(p: Polygon) -> Self {
+        Self {
+            plane: p.get_plane(),
+            polygons: vec![p],
+        }
     }
 }

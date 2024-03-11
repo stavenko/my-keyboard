@@ -1,10 +1,9 @@
-
 use nalgebra::Vector3;
 
 use self::bezier::BezierEdge;
 use self::segment::EdgeSegment;
 
-use super::primitives::decimal::Dec;
+use super::decimal::Dec;
 
 pub mod bezier;
 // pub mod polypath;
@@ -12,20 +11,21 @@ pub mod segment;
 
 #[derive(Clone, Debug)]
 pub enum SomePath {
-    S(EdgeSegment),
-    B(BezierEdge),
+    S(Box<EdgeSegment>),
+    B(Box<BezierEdge>),
 }
 impl From<EdgeSegment> for SomePath {
     fn from(value: EdgeSegment) -> Self {
-        Self::S(value)
+        Self::S(Box::new(value))
     }
 }
 impl From<BezierEdge> for SomePath {
     fn from(value: BezierEdge) -> Self {
-        Self::B(value)
+        Self::B(Box::new(value))
     }
 }
 
+#[allow(clippy::len_without_is_empty)]
 pub trait Path: std::fmt::Debug {
     fn get_t(&self, t: Dec) -> Vector3<Dec>;
     fn len(&self) -> Dec;

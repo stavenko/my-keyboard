@@ -1,10 +1,7 @@
-use nalgebra::{Vector3};
+use nalgebra::Vector3;
 use rust_decimal::prelude::One;
 
-use crate::{
-    path::Path,
-    primitives::{decimal::Dec, Segments},
-};
+use crate::{decimal::Dec, path::Path, primitives::Segments};
 
 use super::PathInverse;
 use num_traits::Pow;

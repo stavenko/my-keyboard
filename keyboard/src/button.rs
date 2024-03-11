@@ -1,9 +1,9 @@
+use geometry::{decimal::Dec, origin::Origin};
 use nalgebra::Vector3;
 use rust_decimal_macros::dec;
 
-use geometry::primitives::{decimal::Dec, origin::Origin};
-
 #[derive(Clone, Debug)]
+#[allow(unused)]
 struct ButtonMount {
     width: Dec,
     height: Dec,

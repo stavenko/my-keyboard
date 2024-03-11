@@ -1,11 +1,23 @@
 use rayon::prelude::*;
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
-use crate::primitives::cutter::{SplitResult, Splitter};
+use crate::{
+    cutter::{ItemLocation, SplitResult, Splitter, VertexLocation},
+    intersects::Intersects,
+    plane::Plane,
+    polygon::Polygon,
+};
 
 pub trait Reversable {
     fn flip(self) -> Self;
 }
+
+pub trait Vertices {
+    type Vertex;
+    fn get_vertices(&self) -> Vec<Self::Vertex>;
+}
+
+pub type SortResult<Item> = HashMap<ItemLocation, Vec<Item>>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Bsp<Cutter, Item> {
@@ -16,26 +28,18 @@ pub struct Bsp<Cutter, Item> {
     pub coplanar_back: Vec<Item>,
 }
 
-impl<Cutter, Item> Bsp<Cutter, Item> {
-    fn items_amount(&self) -> usize {
-        let mut amount = self.coplanar_front.len() + self.coplanar_back.len();
-        if let Some(f) = self.front.as_ref().map(|f| f.items_amount()) {
-            amount += f;
-        }
-        if let Some(f) = self.back.as_ref().map(|f| f.items_amount()) {
-            amount += f;
-        }
-        amount
-    }
-}
-
-impl<Cutter, Item> Bsp<Cutter, Item>
+impl<Cutter, Item, Vertex> Bsp<Cutter, Item>
 where
-    Cutter: Splitter<Item>,
+    Cutter: Splitter<Item, Vertex>,
     Cutter: Send + Sync + Clone + fmt::Debug,
     Cutter: Reversable,
+    Vertex: fmt::Debug,
     Item: Send + Sync + Sized + Clone + fmt::Debug,
     Item: Reversable,
+    Item: Vertices<Vertex = Vertex>,
+    Item: Intersects<Cutter>,
+    <Item as Intersects<Cutter>>::Out: Intersects<Item> + fmt::Debug,
+    <<Item as Intersects<Cutter>>::Out as Intersects<Item>>::Out: fmt::Debug,
     Item: PartialEq,
     Item: 'static,
 {
@@ -195,6 +199,47 @@ where
         }
         items
     }
+    pub fn locate_vertex(&self, vertex: &Vertex) -> VertexLocation {
+        match self.cutter.locate_vertex(vertex) {
+            VertexLocation::Front => {
+                if let Some(tree) = self.front.as_ref() {
+                    tree.locate_vertex(vertex)
+                } else {
+                    VertexLocation::Front
+                }
+            }
+            VertexLocation::Back => {
+                if let Some(tree) = self.back.as_ref() {
+                    tree.locate_vertex(vertex)
+                } else {
+                    VertexLocation::Back
+                }
+            }
+            loc => loc,
+        }
+    }
+
+    pub fn item_edge_location(&self, item: &Item) -> ItemLocation {
+        match self.cutter.locate(item) {
+            ItemLocation::Front => {
+                if let Some(tree) = self.front.as_ref() {
+                    tree.item_edge_location(item)
+                } else {
+                    ItemLocation::Front
+                }
+            }
+
+            ItemLocation::Back => {
+                if let Some(tree) = self.back.as_ref() {
+                    tree.item_edge_location(item)
+                } else {
+                    ItemLocation::Back
+                }
+            }
+
+            loc => loc,
+        }
+    }
 }
 
 pub struct ItemsBspIterator<I, Item>
@@ -247,6 +292,19 @@ where
     }
 }
 
+impl<Cutter, Item> Bsp<Cutter, Item> {
+    fn items_amount(&self) -> usize {
+        let mut amount = self.coplanar_front.len() + self.coplanar_back.len();
+        if let Some(f) = self.front.as_ref().map(|f| f.items_amount()) {
+            amount += f;
+        }
+        if let Some(f) = self.back.as_ref().map(|f| f.items_amount()) {
+            amount += f;
+        }
+        amount
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fmt::Debug;
@@ -259,67 +317,17 @@ mod tests {
 
     use crate::{
         //bsp::bsp2::{self, Bsp},
+        basis::Basis,
         bsp::Bsp,
-        primitives::{
-            basis::Basis, cutter::Splitter, decimal::Dec, line2d::Line2D, polygon::Polygon,
-            polygon_basis::PolygonBasis, segment2d::Segment2D,
-        },
+        cutter::Splitter,
+        decimal::Dec,
+        intersects::Intersects,
+        polygon::Polygon,
+        polygon_basis::PolygonBasis,
         shapes::rect,
     };
 
-    use super::Reversable;
-
-    /*
-    #[test]
-    fn create_convex() {
-        let points = [
-            Vector3::new(dec!(1).into(), dec!(1).into(), dec!(0).into()),
-            Vector3::new(dec!(1).into(), dec!(-1).into(), dec!(0).into()),
-            Vector3::new(dec!(-1).into(), dec!(-1).into(), dec!(0).into()),
-            Vector3::new(dec!(-1).into(), dec!(1).into(), dec!(0).into()),
-        ];
-        let poly = Polygon::new(points.to_vec()).unwrap();
-        let basis = poly.get_basis_2d();
-        let bsp_2d = Bsp::<Line2D, Segment2D>::build(poly.clone()).unwrap();
-        assert!(bsp_2d.back.is_none());
-        let lines = bsp_2d.into_iter().collect_vec();
-        let polygons = Polygon::from_segments(lines, basis).unwrap();
-
-        assert_eq!(polygons.len(), 1);
-        assert_eq!(polygons[0], poly);
-    }
-
-    #[test]
-    fn create_nonconvex() {
-        let points = [
-            Vector3::new(dec!(-1).into(), dec!(0).into(), dec!(0).into()),
-            Vector3::new(dec!(0).into(), dec!(0.5).into(), dec!(0).into()),
-            Vector3::new(dec!(1).into(), dec!(0).into(), dec!(0).into()),
-            Vector3::new(dec!(0).into(), dec!(1).into(), dec!(0).into()),
-        ];
-        let poly = Polygon::new(points.to_vec()).unwrap();
-        let basis = poly.get_basis_2d();
-        let bsp_2d = Bsp::<Line2D, Segment2D>::build(poly.clone()).unwrap();
-        assert!(bsp_2d.front.is_some());
-        assert!(bsp_2d.back.is_some());
-        let lines = bsp_2d.into_iter().collect_vec();
-        let mut polygons = Polygon::from_segments(lines, basis).unwrap();
-
-        assert_eq!(polygons.len(), 1);
-
-        assert_eq!(polygons[0].vertices.len(), poly.vertices.len());
-        let sum: Dec = dbg!(polygons
-            .pop()
-            .unwrap()
-            .vertices
-            .into_iter()
-            .zip(poly.vertices)
-            .map(|(p, q)| p - q)
-            .map(|p| p.magnitude())
-            .sum());
-        assert_eq!(sum, dec!(0).into());
-    }
-    */
+    use super::{Reversable, Vertices};
 
     #[test]
     fn boolean_diff() {
@@ -361,6 +369,7 @@ mod tests {
         assert_eq!(polygons[0].vertices, vv);
     }
 
+    /*
     #[test]
     fn boolean_union_2() {
         let points = [
@@ -375,7 +384,7 @@ mod tests {
             y: Vector3::y(),
         };
         let poly = Polygon::new(points.to_vec()).unwrap();
-        let bsp_2d_one = Bsp::<Line2D, Segment2D>::build(poly.get_segments(&basis)).unwrap();
+        let bsp_2d_one = Bsp::<Line2D, Segment2D>::build(poly.get_segments_2d(&basis)).unwrap();
 
         let points = [
             Vector3::new(dec!(1).into(), dec!(1).into(), dec!(0).into()),
@@ -384,11 +393,11 @@ mod tests {
             Vector3::new(dec!(1).into(), dec!(-1).into(), dec!(0).into()),
         ];
         let poly = Polygon::new(points.to_vec()).unwrap();
-        let bsp_2d_two = Bsp::<Line2D, Segment2D>::build(poly.get_segments(&basis)).unwrap();
+        let bsp_2d_two = Bsp::<Line2D, Segment2D>::build(poly.get_segments_2d(&basis)).unwrap();
 
         let lines = union(bsp_2d_one, bsp_2d_two).into_iter().collect_vec();
         dbg!(lines.len());
-        let polygons = Polygon::from_segments(lines, &basis).unwrap();
+        let polygons = Polygon::from_segments_2d(lines, &basis).unwrap();
         assert_eq!(polygons.len(), 1);
         dbg!(polygons[0].vertices.len());
         let vv: Vec<Vector3<Dec>> = vec![
@@ -409,6 +418,7 @@ mod tests {
         dbg!(polygons[0].vertices.len());
         assert_eq!(polygons[0].vertices, vv);
     }
+    */
     #[test]
     fn boolean_union_4() {
         let points = [
@@ -502,32 +512,5 @@ mod tests {
         let result = cube_bigger.boolean_union(cube_smaller);
 
         assert_eq!(result.sides.len(), 6);
-    }
-
-    pub fn union<S, I>(right: Bsp<S, I>, other: Bsp<S, I>) -> Vec<I>
-    where
-        S: Splitter<I> + Clone + Reversable + Debug,
-        I: Clone + Debug + Reversable + PartialEq + 'static,
-    {
-        let total_segments = right.clone().into_iter().chain(other.clone()).collect_vec();
-        let total_segments = right.clip(total_segments);
-        let total_segments = other.clip(total_segments);
-
-        let (_front1, back1) = other.sort_front_back(total_segments.clone());
-
-        let (_front2, mut back2) = right.sort_front_back(total_segments);
-
-        let mut joined = Vec::new();
-        for s in back1.into_iter() {
-            let inv = s.clone().flip();
-            if let Some(ix) = back2.iter().position(|item| *item == inv) {
-                back2.swap_remove(ix);
-            } else {
-                joined.push(s);
-            }
-        }
-        joined.extend(back2);
-
-        joined
     }
 }

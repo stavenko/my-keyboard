@@ -20,6 +20,7 @@ pub struct Dec(Decimal);
 
 pub const EPS: Dec = Dec(dec!(1e-8));
 pub const STABILITY_ROUNDING: u32 = 27;
+//pub const STABILITY_ROUNDING_F: u32 = 15;
 
 impl SubsetOf<Dec> for Dec {
     fn to_superset(&self) -> Dec {
@@ -244,11 +245,11 @@ impl ComplexField for Dec {
 
 impl RealField for Dec {
     fn is_sign_positive(&self) -> bool {
-        self.0.is_positive()
+        self.0.is_sign_positive()
     }
 
     fn is_sign_negative(&self) -> bool {
-        self.0.is_negative()
+        self.0.is_sign_negative()
     }
 
     fn copysign(self, _sign: Self) -> Self {
@@ -353,11 +354,11 @@ impl Signed for Dec {
     }
 
     fn is_positive(&self) -> bool {
-        self.0.is_positive()
+        self.0.is_sign_positive()
     }
 
     fn is_negative(&self) -> bool {
-        self.0.is_negative()
+        self.0.is_sign_negative()
     }
 }
 impl UlpsEq for Dec {
@@ -498,7 +499,6 @@ impl From<f32> for Dec {
 }
 impl From<Dec> for i128 {
     fn from(value: Dec) -> Self {
-        
         value.0.to_i128().unwrap_or_else(|| {
             println!("WARNING: Cannot convert float f32 to decimal `{value}`, setting 0");
             0
@@ -507,7 +507,6 @@ impl From<Dec> for i128 {
 }
 impl From<Dec> for u32 {
     fn from(value: Dec) -> Self {
-        
         value.0.to_u32().unwrap_or_else(|| {
             println!("WARNING: Cannot convert float u32 to decimal `{value}`, setting 0");
             0
@@ -516,7 +515,6 @@ impl From<Dec> for u32 {
 }
 impl From<Dec> for f64 {
     fn from(value: Dec) -> Self {
-        
         value.0.to_f64().unwrap_or_else(|| {
             println!("WARNING: Cannot convert float f32 to decimal `{value}`, setting 0");
             0.0
@@ -525,7 +523,6 @@ impl From<Dec> for f64 {
 }
 impl From<Dec> for f32 {
     fn from(value: Dec) -> Self {
-        
         value.0.to_f32().unwrap_or_else(|| {
             println!("WARNING: Cannot convert float f32 to decimal `{value}`, setting 0");
             0.0

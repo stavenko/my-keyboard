@@ -2,23 +2,25 @@ use anyhow::anyhow;
 use rust_decimal_macros::dec;
 use std::cmp::Ordering;
 
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use nalgebra::Vector3;
 use num_traits::{One, Signed, Zero};
 use rust_decimal::Decimal;
 
 use crate::button::Button;
 use geometry::{
+    decimal::Dec,
     hull::Hull,
-    mesh::Mesh,
+    origin::Origin,
     path::{bezier::BezierEdge, segment::EdgeSegment, Path, SomePath},
-    primitives::{decimal::Dec, origin::Origin, PointInPlane},
+    primitives::PointInPlane,
     stiching::HullEdgeItem,
     surface::{
         topology::{Four, Three},
         tri_bezier::TriBezier,
         SurfaceBetweenTwoEdgePaths,
     },
+    volume::mesh::Mesh,
 };
 
 use self::{
@@ -66,10 +68,10 @@ impl Angle {
 }
 
 impl KeyboardConfig {
-    fn distance_thumb_main_x(&self) -> Option<Dec> {
+    pub fn distance_thumb_main_x(&self) -> Option<Dec> {
         let left = self.main_button_surface.left_column()?;
         let right = self.thumb_cluster.right_column()?;
-        let leftest = left
+        let leftmost = left
             .buttons()
             .flat_map(|b| {
                 vec![
@@ -82,7 +84,7 @@ impl KeyboardConfig {
             })
             .min_by(|p1, p2| p1.x.total_cmp(&p2.x));
 
-        let righests = right
+        let rightmost = right
             .buttons()
             .flat_map(|b| {
                 vec![
@@ -95,17 +97,17 @@ impl KeyboardConfig {
             })
             .max_by(|p1, p2| p1.x.total_cmp(&p2.x));
 
-        leftest.and_then(|l| righests.map(|r| (r - l).x.abs()))
+        leftmost.and_then(|l| rightmost.map(|r| (r - l).x.abs()))
     }
-    pub(crate) fn thumb_buttons(&self) -> Box<dyn Iterator<Item = Button> + '_> {
+    pub fn thumb_buttons(&self) -> Box<dyn Iterator<Item = Button> + '_> {
         self.thumb_cluster.buttons()
     }
 
-    pub(crate) fn main_buttons(&self) -> Box<dyn Iterator<Item = Button> + '_> {
+    pub fn main_buttons(&self) -> Box<dyn Iterator<Item = Button> + '_> {
         self.main_button_surface.buttons()
     }
 
-    pub(crate) fn buttons(&self) -> Box<dyn Iterator<Item = Button> + '_> {
+    pub fn buttons(&self) -> Box<dyn Iterator<Item = Button> + '_> {
         Box::new(self.main_buttons().chain(self.thumb_buttons()))
     }
 
@@ -182,10 +184,9 @@ impl KeyboardConfig {
         }
     }
 
-    pub fn build_total_wall(&self) -> Result<Mesh, anyhow::Error> {
-        let mut edge_items = self.edge_around().take(10).peekable();
+    pub fn build_total_wall(&self) -> anyhow::Result<Mesh> {
+        let mut edge_items = self.edge_around().skip(12).take(1).peekable();
         let mut mesh: Option<Mesh> = None;
-        // let mut corners = Vec::new();
         while let Some(surface_edge) = edge_items.next() {
             let base_plane = self.get_base_plane_projection(&surface_edge);
             let inner = SurfaceBetweenTwoEdgePaths::new(
@@ -198,12 +199,11 @@ impl KeyboardConfig {
             );
             let hull: Hull<Four> = (inner, outer).try_into()?;
             if let Some(body) = mesh.take() {
-                match body.boolean_union(hull.try_into()?) {
-                    Either::Left(result) => mesh = Some(result),
-                    Either::Right(_) => {
-                        return Err(anyhow!("Couldn't join two meshes"));
-                    }
+                let mut result = body.boolean_union(hull.try_into()?);
+                if result.len() > 1 {
+                    panic!("no union");
                 }
+                mesh = Some(result.remove(0));
             } else {
                 mesh = Some(hull.try_into()?);
             }
@@ -281,15 +281,12 @@ impl KeyboardConfig {
                         Dec::one(),
                     );
                     let hull: Hull<Three> = (inner_bezier, outer_bezier).try_into()?;
-                    //faces.join(hull)?;
-                    // corners.push(hull.try_into()?);
                     if let Some(body) = mesh.take() {
-                        match body.boolean_union(hull.try_into()?) {
-                            Either::Left(result) => mesh = Some(result),
-                            Either::Right(_) => {
-                                return Err(anyhow!("Couldn't join two meshes"));
-                            }
+                        let mut result = body.boolean_union(hull.try_into()?);
+                        if result.len() > 1 {
+                            panic!("no union");
                         }
+                        mesh = Some(result.remove(0));
                     } else {
                         mesh = Some(hull.try_into()?);
                     }
@@ -701,7 +698,7 @@ impl KeyboardConfig {
         self.main_button_surface.bottom_buttons()
     }
 
-    fn thumb_right_buttons(&self) -> Box<dyn Iterator<Item = Button> + '_> {
+    pub fn thumb_right_buttons(&self) -> Box<dyn Iterator<Item = Button> + '_> {
         self.thumb_cluster.right_buttons()
     }
 

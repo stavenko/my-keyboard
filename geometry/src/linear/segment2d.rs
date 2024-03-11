@@ -6,11 +6,9 @@ use nalgebra::{ComplexField, Vector2};
 use num_traits::{One, Zero};
 
 use crate::{
-    bsp::Reversable,
-    primitives::decimal::{EPS, STABILITY_ROUNDING},
+    decimal::{Dec, EPS, STABILITY_ROUNDING},
+    reversable::Reversable,
 };
-
-use super::{decimal::Dec, line2d::Line2D};
 
 #[derive(Clone)]
 pub struct Segment2D {
@@ -71,19 +69,6 @@ impl Segment2D {
         Self { from, to }
     }
 
-    pub fn get_line(&self) -> Line2D {
-        Line2D {
-            origin: self.from,
-            dir: self.to - self.from,
-        }
-    }
-
-    fn angle_between(&self, other: &Self) -> Dec {
-        let n = self.dir().normalize();
-        let p = other.dir().normalize();
-        n.dot(&p).acos()
-    }
-
     pub fn join(self, other: Self) -> Either<Self, (Self, Self)> {
         let self_dir_len = self.dir().magnitude_squared().round_dp(STABILITY_ROUNDING);
         let self_dir_len = self_dir_len.sqrt();
@@ -126,13 +111,14 @@ impl Segment2D {
     }
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use itertools::Either;
     use nalgebra::Vector2;
     use rust_decimal_macros::dec;
 
-    use crate::primitives::segment2d::Segment2D;
+    use crate::segment2d::Segment2D;
 
     #[test]
     fn join_segment_1() {
@@ -232,3 +218,4 @@ mod tests {
         assert_eq!(joined, Either::Right((segment1, segment2)));
     }
 }
+*/

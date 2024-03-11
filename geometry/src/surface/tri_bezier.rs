@@ -2,9 +2,10 @@ use nalgebra::Vector3;
 use num_traits::{One, Pow};
 
 use crate::{
+    decimal::Dec,
     geometry::Geometry,
     path::{bezier::BezierEdge, segment::EdgeSegment, Path},
-    primitives::{decimal::Dec, polygon::Polygon},
+    planar::polygon::Polygon,
 };
 
 use super::{

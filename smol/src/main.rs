@@ -19,13 +19,12 @@ fn main() -> Result<(), anyhow::Error> {
 
     let keyboard = keyboard::KeyboardConfig::simple();
 
-    println!("do");
     let wall = keyboard.build_total_wall()?;
-    println!("done");
 
     let mut writer = OpenOptions::new()
         .write(true)
         .truncate(true)
+        .create(true)
         .open(cli.output_path)?;
 
     stl_io::write_stl(&mut writer, wall.into_iter())?;

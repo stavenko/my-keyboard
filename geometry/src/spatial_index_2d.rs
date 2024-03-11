@@ -1,6 +1,8 @@
-use nalgebra::Vector2;
+use nalgebra::{ComplexField, Vector2};
 
-use super::primitives::decimal::Dec;
+use crate::decimal::STABILITY_ROUNDING;
+
+use super::decimal::Dec;
 
 #[derive(Debug)]
 pub enum IndexContents {
@@ -24,7 +26,7 @@ impl Default for Index {
 }
 
 impl Index {
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         matches!(self.contents, IndexContents::Empty)
     }
 
@@ -50,7 +52,12 @@ impl Index {
             }
             IndexContents::Single(v) => {
                 let diff = *v - p;
-                if diff.magnitude() > Dec::EPSILON {
+                if diff
+                    .magnitude_squared()
+                    .round_dp(STABILITY_ROUNDING - 2)
+                    .sqrt()
+                    > Dec::EPSILON
+                {
                     let quadrants = Self::sort(vec![*v, p], &self.middle)
                         .map(|points| Box::new(Index::new(points)));
                     self.contents = IndexContents::Quadrants(quadrants);

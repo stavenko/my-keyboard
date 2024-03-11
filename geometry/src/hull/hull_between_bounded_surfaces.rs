@@ -2,14 +2,12 @@ use std::marker::PhantomData;
 
 use crate::{
     geometry::Geometry,
-    primitives::polygon::Polygon,
+    planar::polygon::Polygon,
     surface::{
         topology::{Four, Three, Topology},
         GetBoundingPath, Surface, SurfaceBetweenTwoPaths,
     },
 };
-
-
 
 /// Generic hull between two surfaces.
 /// Expected, that surfaces have following properties:

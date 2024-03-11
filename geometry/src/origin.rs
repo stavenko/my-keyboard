@@ -44,12 +44,12 @@ impl Origin {
         self
     }
 
-    fn offset(mut self, axis: Vector3<Dec>) -> Self {
+    pub fn offset(mut self, axis: Vector3<Dec>) -> Self {
         self.center = axis + self.center;
         self
     }
 
-    fn rotate(mut self, quat: UnitQuaternion<Dec>) -> Self {
+    pub fn rotate(mut self, quat: UnitQuaternion<Dec>) -> Self {
         self.rotation *= quat;
         self
     }

@@ -1,11 +1,13 @@
 use std::iter::Peekable;
 
+type Cons<O, I> = Box<dyn Fn(&<I as Iterator>::Item, &<I as Iterator>::Item) -> O>;
+
 pub struct NextAndPeek<I, O>
 where
     I: Iterator,
 {
     inner: Peekable<I>,
-    constructor: Box<dyn Fn(&I::Item, &I::Item) -> O>,
+    constructor: Cons<O, I>,
 }
 
 impl<I, O> Iterator for NextAndPeek<I, O>

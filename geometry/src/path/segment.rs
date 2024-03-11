@@ -1,4 +1,4 @@
-use crate::primitives::decimal::Dec;
+use crate::decimal::Dec;
 use nalgebra::Vector3;
 
 use super::{Path, PathInverse};

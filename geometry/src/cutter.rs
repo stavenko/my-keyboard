@@ -59,8 +59,25 @@ pub enum Location {
     Coplanar,
 }
 
-pub trait Splitter<Item> {
+#[derive(Eq, PartialEq, Hash, Debug)]
+pub enum ItemLocation {
+    Front,
+    Back,
+    Co,
+    UnCo,
+    Split,
+}
+
+#[derive(Eq, PartialEq, Hash, Debug)]
+pub enum VertexLocation {
+    Front,
+    Back,
+    On,
+}
+
+pub trait Splitter<Item, Vertex> {
     fn split(&self, item: Item) -> SplitResult<Item>;
-    fn locate(&self, item: Item) -> Location;
+    fn locate(&self, item: &Item) -> ItemLocation;
+    fn locate_vertex(&self, vertex: &Vertex) -> VertexLocation;
     fn from_item(item: &Item) -> Self;
 }

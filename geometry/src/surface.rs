@@ -5,13 +5,13 @@ use itertools::Itertools;
 use nalgebra::Vector3;
 use num_traits::{One, Zero};
 
-use crate::geometry::Geometry;
+use crate::{geometry::Geometry, planar::polygon::Polygon};
 
 use self::topology::{Four, Topology};
 
 use super::{
+    decimal::Dec,
     path::{bezier::BezierEdge, segment::EdgeSegment, Path},
-    primitives::{decimal::Dec, polygon::Polygon},
 };
 
 pub mod topology;
@@ -40,10 +40,7 @@ impl<P: Path, S: Path> Geometry for SurfaceBetweenTwoEdgePaths<P, S, Four> {
         let faces = Four::parametric_face_iterator()
             .map(|pf| match pf.map(|p| self.get_point(p)) {
                 [Ok(a), Ok(b), Ok(c)] => Polygon::new(vec![a, b, c]),
-                err => {
-                    dbg!(err);
-                    Err(anyhow!("failed to create faces"))
-                }
+                _ => Err(anyhow!("failed to create faces")),
             })
             .try_collect::<_, Vec<_>, _>()?;
         Ok(faces)
@@ -100,14 +97,17 @@ impl<P: Path, S: Path> Surface<Four> for SurfaceBetweenTwoEdgePaths<P, S, Four> 
         let right_w = self.1.get_edge_dir(s) + right;
         let b = self.0.get_t(Dec::zero());
         let e = self.0.get_t(Dec::one());
-        let dirl = (e - b).normalize();
+        let dir_left = (e - b).normalize();
         let b = self.1.get_t(Dec::zero());
         let e = self.1.get_t(Dec::one());
-        let dirr = (e - b).normalize();
-        let dir1 = dirl.lerp(&dirr, Dec::one() / 3).normalize();
-        let dir2 = dirl.lerp(&dirr, 2 * Dec::one() / 3).normalize();
+        let dir_right = (e - b).normalize();
+        let dir1 = dir_left.lerp(&dir_right, Dec::one() / 3).normalize();
+        let dir2 = dir_left.lerp(&dir_right, 2 * Dec::one() / 3).normalize();
 
-        BezierEdge::new([left, left_w, right_w, right], [dirl, dir1, dir2, dirr])
+        BezierEdge::new(
+            [left, left_w, right_w, right],
+            [dir_left, dir1, dir2, dir_right],
+        )
     }
 }
 
@@ -148,16 +148,16 @@ impl<P: Path, S: Path, T: Topology> SurfaceBetweenTwoEdgePaths<P, S, T> {
         let right_w = self.1.get_edge_dir(s) + right;
         let b = self.0.get_t(Dec::zero());
         let e = self.0.get_t(Dec::one());
-        let dirl = (b - e).normalize();
+        let dir_left = (b - e).normalize();
         let b = self.1.get_t(Dec::zero());
         let e = self.1.get_t(Dec::one());
-        let dirr = (b - e).normalize();
-        let dir1 = dirl.lerp(&dirr, Dec::one() / 3).normalize() * edge_force;
-        let dir2 = dirl.lerp(&dirr, 2 * Dec::one() / 3).normalize() * edge_force;
+        let dir_right = (b - e).normalize();
+        let dir1 = dir_left.lerp(&dir_right, Dec::one() / 3).normalize() * edge_force;
+        let dir2 = dir_left.lerp(&dir_right, 2 * Dec::one() / 3).normalize() * edge_force;
 
         BezierEdge::new(
             [left, left_w, right_w, right],
-            [dirl * edge_force, dir1, dir2, dirr * edge_force],
+            [dir_left * edge_force, dir1, dir2, dir_right * edge_force],
         )
     }
 }
@@ -248,7 +248,7 @@ impl<T, const D: usize> Geometry<D> for T
 where
     T: GenericBoundedSurface<Four>,
 {
-    fn polygonize(&self) -> anyhow::Result<Vec<crate::primitives::Face>> {
+    fn polygonize(&self) -> anyhow::Result<Vec<crate::Face>> {
         let maybe_faces = |prev: <Four as Topology>::ParametricCoords,
                            next: <Four as Topology>::ParametricCoords|
          -> anyhow::Result<Vec<[Vector3<Dec>; 3]>> {

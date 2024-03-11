@@ -1,9 +1,9 @@
-use geometry::primitives::origin::Origin;
+use geometry::origin::Origin;
 
 use super::button::Button;
 
 #[derive(Clone, Debug)]
-pub(crate) struct ButtonsColumn {
+pub struct ButtonsColumn {
     buttons: Vec<Button>,
     top_button_ix: usize,
     bottom_button_ix: usize,
@@ -20,7 +20,7 @@ impl ButtonsColumn {
         }
     }
 
-    pub(crate) fn chocs(mut self, mut buttons: Vec<Button>) -> Self {
+    pub(crate) fn chocs(mut self, buttons: Vec<Button>) -> Self {
         self.buttons = buttons;
         self.bottom_button_ix = self.buttons.len() - 1;
         self

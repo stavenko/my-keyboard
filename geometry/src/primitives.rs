@@ -4,17 +4,7 @@ use nalgebra::Vector3;
 use num_traits::Zero;
 use stl_io::{Triangle, Vector};
 
-use self::{decimal::Dec, plane::Plane};
-
-pub mod cutter;
-pub mod decimal;
-pub mod line;
-pub mod line2d;
-pub mod plane;
-pub mod polygon;
-pub mod polygon_basis;
-pub mod segment;
-pub mod segment2d;
+use crate::{decimal::Dec, planar::plane::Plane};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Face {
@@ -23,7 +13,7 @@ pub struct Face {
 }
 
 impl Face {
-    fn new_with_normal(vertices: [Vector3<Dec>; 3], normal: Vector3<Dec>) -> Self {
+    pub fn new_with_normal(vertices: [Vector3<Dec>; 3], normal: Vector3<Dec>) -> Self {
         Face { vertices, normal }
     }
 }
@@ -57,12 +47,6 @@ impl IntoIterator for Face {
 }
 
 impl Face {
-    /*
-    pub fn map(&self, f: impl Fn(Vector3<Dec>) -> Vector3<Dec>) -> Self {
-        Self(self.0.map(f))
-    }
-    */
-
     pub fn iter(&self) -> Iter<'_, Vector3<Dec>> {
         self.vertices.iter()
     }
@@ -86,15 +70,6 @@ impl Face {
         let [u, _v, _w] = &self.vertices;
         let origin = *u;
         Plane::new_from_normal_and_point(self.normal, origin)
-    }
-
-    pub(crate) fn flip(self) -> Face {
-        let [a, b, c] = self.vertices;
-        let normal = -self.normal;
-        Self {
-            vertices: [a, c, b],
-            normal,
-        }
     }
 
     fn get_normal(&self) -> Vector3<Dec> {

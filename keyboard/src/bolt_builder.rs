@@ -1,6 +1,4 @@
-use std::f32::consts::PI;
-
-use nalgebra::{Vector2, Vector3};
+use nalgebra::Vector3;
 
 #[derive(Clone, Debug)]
 pub enum Nut {

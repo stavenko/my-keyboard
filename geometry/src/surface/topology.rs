@@ -1,7 +1,7 @@
 use nalgebra::{Vector2, Vector3};
 use std::iter;
 
-use crate::primitives::{decimal::Dec, Segments};
+use crate::{decimal::Dec, primitives::Segments};
 
 pub trait Topology {
     const DIMS: usize;

@@ -1,8 +1,4 @@
-use crate::{
-    edge::Edge,
-    mesh::Mesh,
-    primitives::{basis::Basis, decimal::Dec, polygon::Polygon},
-};
+use crate::{basis::Basis, decimal::Dec, edge::Edge, planar::polygon::Polygon, volume::mesh::Mesh};
 use nalgebra::{ComplexField, Vector3};
 use num_traits::Zero;
 use rust_decimal::Decimal;
@@ -61,7 +57,6 @@ pub fn rect(b: Basis, w: Dec, h: Dec, d: Dec) -> Mesh {
         far_basis.center() + hh + ww,
     ])
     .unwrap();
-    println!("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
     Mesh {
         sides: vec![
             Edge {

@@ -1,8 +1,11 @@
+use crate::planar::plane::Plane;
 use core::fmt;
 
 use nalgebra::{Vector2, Vector3};
 
-use super::{decimal::Dec, plane::Plane, polygon_basis::PolygonBasis};
+use crate::decimal::Dec;
+
+use super::polygon_basis::PolygonBasis;
 
 #[derive(Clone)]
 pub struct Basis {

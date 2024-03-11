@@ -1,15 +1,12 @@
 use std::marker::PhantomData;
 
-use crate::geometry::Geometry;
+use crate::{geometry::Geometry, planar::polygon::Polygon};
 
 use self::hull_between_bounded_surfaces::HullBetweenSurfaces;
 
-use super::{
-    primitives::polygon::Polygon,
-    surface::{
-        topology::{Four, Three, Topology},
-        GetBoundingPath, Surface,
-    },
+use super::surface::{
+    topology::{Four, Three, Topology},
+    GetBoundingPath, Surface,
 };
 
 pub mod hull_between_bounded_surfaces;

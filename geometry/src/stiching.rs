@@ -1,16 +1,17 @@
 use std::fmt::Debug;
 
-use crate::geometry::FaceCollection;
-
 #[derive(Clone, Debug)]
 pub struct HullEdgeItem<T> {
     pub inner: T,
     pub outer: T,
 }
 
+/*
 pub(crate) trait StitchTopology<const D: usize, Other> {
     fn stitch_topology(self, other: Other) -> anyhow::Result<FaceCollection>;
 }
+
+*/
 
 pub struct StichItem<T> {
     pub left: HullEdgeItem<T>,
