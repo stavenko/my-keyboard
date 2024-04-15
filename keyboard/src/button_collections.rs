@@ -7,7 +7,6 @@ use super::{button::Button, ButtonsColumn};
 #[derive(Debug)]
 #[allow(unused)]
 pub struct ButtonsCollection {
-    thickness: f32,
     pub origin: Origin,
     columns: Vec<ButtonsColumn>,
     first_column_ix: usize,
@@ -80,10 +79,9 @@ impl ButtonsCollection {
         self.last_column_ix = self.columns.len() - 1;
         self
     }
-    pub fn new(origin: Origin, thickness: f32) -> Self {
+    pub fn new(origin: Origin) -> Self {
         Self {
             origin,
-            thickness,
             columns: Vec::new(),
             first_column_ix: 0,
             last_column_ix: 0,

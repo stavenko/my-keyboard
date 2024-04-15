@@ -57,34 +57,14 @@ pub fn rect(b: Basis, w: Dec, h: Dec, d: Dec) -> Mesh {
         far_basis.center() + hh + ww,
     ])
     .unwrap();
-    Mesh {
-        sides: vec![
-            Edge {
-                plane: top_basis.xy(),
-                polygons: vec![top],
-            },
-            Edge {
-                plane: bottom_basis.xy(),
-                polygons: vec![bottom],
-            },
-            Edge {
-                plane: left_basis.xy(),
-                polygons: vec![left],
-            },
-            Edge {
-                plane: right_basis.xy(),
-                polygons: vec![right],
-            },
-            Edge {
-                plane: near_basis.xy(),
-                polygons: vec![near],
-            },
-            Edge {
-                plane: far_basis.xy(),
-                polygons: vec![far],
-            },
-        ],
-    }
+    Mesh::new(vec![
+        Edge::from_polygon(top),
+        Edge::from_polygon(bottom),
+        Edge::from_polygon(right),
+        Edge::from_polygon(left),
+        Edge::from_polygon(near),
+        Edge::from_polygon(far),
+    ])
 }
 
 pub fn cylinder(b: Basis, h: Dec, r: Dec, s: usize) -> Mesh {
@@ -114,32 +94,25 @@ pub fn cylinder(b: Basis, h: Dec, r: Dec, s: usize) -> Mesh {
             + bottom_basis.x() * ap.cos() * r
             + bottom_basis.y() * ap.sin() * r;
 
-        let u = apt;
-        let v = ant;
-        let w = anb;
-        let a = v - u;
-        let b = w - u;
-        let z = a.cross(&b).normalize();
-        let y = a.normalize();
-        let x = z.cross(&y).normalize();
+        //let u = apt;
+        //let v = ant;
+        //let w = anb;
+        //let a = v - u;
+        //let b = w - u;
+        //let z = a.cross(&b).normalize();
+        //let y = a.normalize();
+        //let x = z.cross(&y).normalize();
 
-        let basis = Basis::new(x, z, y, (apt + apb + anb + ant) / Dec::from(4)).unwrap();
-        wall.push(Edge {
-            polygons: vec![Polygon::new(vec![apt, ant, anb, apb]).unwrap()],
-            plane: basis.xy(),
-        });
+        //let basis = Basis::new(x, z, y, (apt + apb + anb + ant) / Dec::from(4)).unwrap();
+        wall.push(Edge::from_polygon(
+            Polygon::new(vec![apt, ant, anb, apb]).unwrap(),
+        ));
         top.push(apt);
         bottom.push(bottom_point);
     }
-    wall.push(Edge {
-        polygons: vec![Polygon::new(top).unwrap()],
-        plane: top_basis.xy(),
-    });
+    wall.push(Edge::from_polygon(Polygon::new(top).unwrap()));
 
-    wall.push(Edge {
-        polygons: vec![Polygon::new(bottom).unwrap()],
-        plane: bottom_basis.xy(),
-    });
+    wall.push(Edge::from_polygon(Polygon::new(bottom).unwrap()));
 
-    Mesh { sides: wall }
+    Mesh::new(wall)
 }

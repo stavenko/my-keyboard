@@ -1,3 +1,5 @@
+use std::fmt;
+
 use nalgebra::Vector3;
 use rust_decimal::prelude::One;
 
@@ -6,12 +8,33 @@ use crate::{decimal::Dec, path::Path, primitives::Segments};
 use super::PathInverse;
 use num_traits::Pow;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct BezierEdge {
     pub base: [Vector3<Dec>; 4],
     edge_force: [Vector3<Dec>; 4],
     len_cache: Option<Dec>,
     quality: usize,
+}
+
+impl fmt::Debug for BezierEdge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "\n{}… {}… {}… \n{}… {}… {}… \n{}… {}… {}… \n{}… {}… {}… \n",
+            self.base[0].x.round_dp(4),
+            self.base[0].y.round_dp(4),
+            self.base[0].z.round_dp(4),
+            self.base[1].x.round_dp(4),
+            self.base[1].y.round_dp(4),
+            self.base[1].z.round_dp(4),
+            self.base[2].x.round_dp(4),
+            self.base[2].y.round_dp(4),
+            self.base[2].z.round_dp(4),
+            self.base[3].x.round_dp(4),
+            self.base[3].y.round_dp(4),
+            self.base[3].z.round_dp(4),
+        )
+    }
 }
 
 impl PathInverse for BezierEdge {

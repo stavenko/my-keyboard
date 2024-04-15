@@ -185,9 +185,10 @@ impl KeyboardConfig {
     }
 
     pub fn build_total_wall(&self) -> anyhow::Result<Mesh> {
-        let mut edge_items = self.edge_around().skip(12).take(1).peekable();
+        let mut edge_items = self.edge_around().peekable();
         let mut mesh: Option<Mesh> = None;
         while let Some(surface_edge) = edge_items.next() {
+            dbg!("---");
             let base_plane = self.get_base_plane_projection(&surface_edge);
             let inner = SurfaceBetweenTwoEdgePaths::new(
                 surface_edge.inner.clone(),
@@ -287,6 +288,9 @@ impl KeyboardConfig {
                             panic!("no union");
                         }
                         mesh = Some(result.remove(0));
+                        //mesh = Some(hull.try_into()?);
+                        //println!("-----------DEBUG VIEW -----------");
+                        //return hull.try_into();
                     } else {
                         mesh = Some(hull.try_into()?);
                     }
@@ -354,8 +358,6 @@ impl KeyboardConfig {
         let mains = self.main_left_edge();
 
         thumbs.zip(mains).take(1).map(|(thumb, main)| {
-            dbg!(self.transition_curvature.main_inner);
-
             let inner_line = [
                 main.inner.from,
                 main.inner.from + main.inner.edge_from * self.transition_curvature.main_inner,
@@ -389,6 +391,10 @@ impl KeyboardConfig {
 
     fn thumb_bottom_edge(&self) -> impl Iterator<Item = HullEdgeItem<EdgeSegment>> + '_ {
         self.thumb_bottom_buttons()
+            .map(|mut b| {
+                b.origin.add(&self.base);
+                b
+            })
             .sorted_by(sorted_along_vec(self.base.x()))
             .flat_map(|btn| {
                 vec![
@@ -439,6 +445,10 @@ impl KeyboardConfig {
     }
     fn main_bottom_edge(&self) -> impl Iterator<Item = HullEdgeItem<EdgeSegment>> + '_ {
         self.main_bottom_buttons()
+            .map(|mut b| {
+                b.origin.add(&self.base);
+                b
+            })
             .sorted_by(sorted_along_vec(self.base.x()))
             .flat_map(|btn| {
                 vec![
@@ -490,6 +500,10 @@ impl KeyboardConfig {
 
     fn main_right_edge(&self) -> impl Iterator<Item = HullEdgeItem<EdgeSegment>> + '_ {
         self.main_right_buttons()
+            .map(|mut b| {
+                b.origin.add(&self.base);
+                b
+            })
             .sorted_by(sorted_along_vec(self.base.y()))
             .flat_map(|btn| {
                 vec![
@@ -540,6 +554,10 @@ impl KeyboardConfig {
     }
     fn thumb_left_edge(&self) -> impl Iterator<Item = HullEdgeItem<EdgeSegment>> + '_ {
         self.thumb_left_buttons()
+            .map(|mut b| {
+                b.origin.add(&self.base);
+                b
+            })
             .sorted_by(sorted_along_vec(-self.base.y()))
             .flat_map(|btn| {
                 vec![
@@ -590,6 +608,10 @@ impl KeyboardConfig {
     }
     fn main_left_edge(&self) -> impl Iterator<Item = HullEdgeItem<EdgeSegment>> + '_ {
         self.main_left_buttons()
+            .map(|mut b| {
+                b.origin.add(&self.base);
+                b
+            })
             .sorted_by(sorted_along_vec(-self.base.y()))
             .flat_map(|btn| {
                 vec![
@@ -645,6 +667,10 @@ impl KeyboardConfig {
 
     fn main_top_edge(&self) -> impl Iterator<Item = HullEdgeItem<EdgeSegment>> + '_ {
         self.main_top_buttons()
+            .map(|mut b| {
+                b.origin.add(&self.base);
+                b
+            })
             .sorted_by(sorted_along_vec(-self.base.x()))
             .flat_map(|btn| {
                 vec![
@@ -705,6 +731,10 @@ impl KeyboardConfig {
     fn thumb_right_edge(&self) -> impl Iterator<Item = HullEdgeItem<EdgeSegment>> + '_ {
         self.thumb_cluster
             .right_buttons()
+            .map(|mut b| {
+                b.origin.add(&self.base);
+                b
+            })
             .sorted_by(sorted_along_vec(-self.base.y()))
             .flat_map(|btn| {
                 vec![
@@ -760,6 +790,10 @@ impl KeyboardConfig {
     fn thumb_top_edge(&self) -> impl Iterator<Item = HullEdgeItem<EdgeSegment>> + '_ {
         self.thumb_cluster
             .top_buttons()
+            .map(|mut b| {
+                b.origin.add(&self.base);
+                b
+            })
             .sorted_by(sorted_along_vec(-self.base.x()))
             .flat_map(|btn| {
                 vec![
@@ -814,7 +848,8 @@ impl KeyboardConfig {
     }
 
     pub fn simple() -> Self {
-        let root = Origin::new();
+        let root = Origin::new().offset_z(Dec::from(dec!(11)));
+
         let buttons_first = vec![
             Button::chok(
                 root.clone()
@@ -840,19 +875,16 @@ impl KeyboardConfig {
                 thumb_inner: dec!(1).into(),
                 thumb_outer: dec!(1).into(),
             },
-            base: Origin::new(),
-            main_button_surface: ButtonsCollection::new(root.clone().offset_z(10.into()), 2.0)
-                .with_columns(vec![
-                    ButtonsColumn::new(root.clone()).chocs(buttons_first.clone()),
-                    ButtonsColumn::new(root.clone().offset_x(20.into()))
-                        .chocs(buttons_second.clone()),
-                ]),
+            base: root.clone(),
+            main_button_surface: ButtonsCollection::new(Origin::new()).with_columns(vec![
+                ButtonsColumn::new(root.clone()).chocs(buttons_first.clone()),
+                ButtonsColumn::new(root.clone().offset_x(20.into())).chocs(buttons_second.clone()),
+            ]),
             thumb_cluster: ButtonsCollection::new(
                 root.clone()
                     .offset_x(Dec::from(-30))
-                    .offset_z(10.into())
+                    .offset_z(60.into())
                     .rotate_axisangle(Vector3::y() * Angle::Deg(Dec::from(-60)).rad()),
-                2.0,
             )
             .with_columns(vec![
                 ButtonsColumn::new(root.clone()).chocs(vec![

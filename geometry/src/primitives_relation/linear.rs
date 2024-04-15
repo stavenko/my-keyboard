@@ -2,7 +2,7 @@ use nalgebra::{ComplexField, Matrix2, Vector2, Vector3};
 use num_traits::{One, Signed, Zero};
 
 use crate::{
-    decimal::{Dec, STABILITY_ROUNDING},
+    decimal::{Dec, NORMAL_DOT_ROUNDING, STABILITY_ROUNDING},
     linear::{line::Line, ray::Ray, segment::Segment},
 };
 
@@ -127,13 +127,10 @@ impl Relation<Segment> for Line {
         let q = self.origin - to.from;
 
         if dot.abs().is_one() {
-            let magnitude_squared = q
-                .magnitude_squared()
-                .round_dp(STABILITY_ROUNDING - 2)
-                .sqrt();
-            let point_dot = q.dot(&self.dir).abs();
+            let magnitude_squared = q.magnitude_squared().round_dp(NORMAL_DOT_ROUNDING).sqrt();
+            let point_dot = q.dot(&self.dir).abs().round_dp(NORMAL_DOT_ROUNDING);
             if (point_dot - magnitude_squared)
-                .round_dp(STABILITY_ROUNDING)
+                .round_dp(NORMAL_DOT_ROUNDING)
                 .is_zero()
             {
                 return if dot.is_positive() {
@@ -143,7 +140,8 @@ impl Relation<Segment> for Line {
                 };
             }
         }
-        let dot = self.dir.dot(&segment_dir);
+        let dot = self.dir.dot(&segment_dir).round_dp(STABILITY_ROUNDING);
+        //dbg!(dot.round_dp(STABILITY_ROUNDING));
 
         let m = Matrix2::new(Dec::from(1), -dot, dot, -Dec::from(1));
         let b = -Vector2::new(q.dot(&self.dir), q.dot(&segment_dir));
@@ -157,8 +155,8 @@ impl Relation<Segment> for Line {
                 .round_dp(STABILITY_ROUNDING)
                 .is_zero()
             {
-                let segment_len = to.dir().magnitude().round_dp(STABILITY_ROUNDING);
-                let y = (st.y / segment_len).round_dp(STABILITY_ROUNDING - 1);
+                let segment_len = to.dir().magnitude().round_dp(NORMAL_DOT_ROUNDING);
+                let y = (st.y / segment_len).round_dp(NORMAL_DOT_ROUNDING);
 
                 if y.is_negative() || y > Dec::one() {
                     LinearRelation::Independent
@@ -197,7 +195,7 @@ impl Relation<Segment> for Ray {
             }
         }
 
-        let dot = self.dir.dot(&segment_dir);
+        let dot = self.dir.dot(&segment_dir).round_dp(STABILITY_ROUNDING - 1);
 
         let m = Matrix2::new(Dec::from(1), -dot, dot, -Dec::from(1));
         let b = -Vector2::new(q.dot(&self.dir), q.dot(&segment_dir));
@@ -212,7 +210,7 @@ impl Relation<Segment> for Ray {
                 .is_zero()
             {
                 let segment_len = to.dir().magnitude().round_dp(STABILITY_ROUNDING);
-                let y = (st.y / segment_len).round_dp(STABILITY_ROUNDING - 1);
+                let y = (st.y / segment_len).round_dp(STABILITY_ROUNDING - 3);
 
                 if y.is_negative() || y > Dec::one() || st.x.is_negative() {
                     LinearRelation::Independent

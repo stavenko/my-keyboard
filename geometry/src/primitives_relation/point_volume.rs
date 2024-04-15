@@ -1,82 +1,128 @@
+use itertools::Itertools;
 use nalgebra::Vector3;
 use num_traits::{Signed, Zero};
 
 use crate::{
     decimal::{Dec, STABILITY_ROUNDING},
+    edge::Edge,
     linear::{ray::Ray, segment::Segment},
-    planar::polygon::Polygon,
+    planar::plane::Plane,
     primitives_relation::linear_planar::LinearPolygonRelation,
     volume::mesh::Mesh,
 };
 
-use super::{point_planar::PointPolygonRelation, relation::Relation};
+use super::{point_planar::PointEdgeRelation, relation::Relation};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum PointVolumeRelation {
     In,
     Out,
     Edge(Segment),
     Vertex,
-    Side(Polygon),
+    Side(Edge),
 }
 
 impl Relation<Vector3<Dec>> for Mesh {
     type Relate = PointVolumeRelation;
 
     fn relate(&self, to: &Vector3<Dec>) -> Self::Relate {
+        let pt = self.sides().next().expect("we have a side").bound.middle();
         let ray = Ray {
             origin: *to,
-            dir: Vector3::y(),
+            dir: (pt - to).normalize(),
         };
 
         let mut parity = 0;
-        for p in self.polygons() {
-            match p.relate(to) {
-                PointPolygonRelation::In => return PointVolumeRelation::Side(p),
-                PointPolygonRelation::Edge(segment) => return PointVolumeRelation::Edge(segment),
-                PointPolygonRelation::Vertex => return PointVolumeRelation::Vertex,
-                PointPolygonRelation::WithNormal => {}
-                PointPolygonRelation::OpposeToNormal => {}
-                PointPolygonRelation::InPlane => {}
+        let mut checked_edges: Vec<Segment> = Vec::new();
+        for edge in self.sides() {
+            match edge.relate(to) {
+                PointEdgeRelation::In => return PointVolumeRelation::Side(edge.into_owned()),
+                PointEdgeRelation::Edge(segment) => return PointVolumeRelation::Edge(segment),
+                PointEdgeRelation::Vertex => return PointVolumeRelation::Vertex,
+                PointEdgeRelation::WithNormal => {}
+                PointEdgeRelation::OpposeToNormal => {}
+                PointEdgeRelation::InPlane => {}
             }
 
-            match ray.relate(&p) {
-                LinearPolygonRelation::IntersectPlane(_) => {
+            match ray.relate(edge.as_ref()) {
+                LinearPolygonRelation::IntersectPlaneInside(_) => {
+                    /*
+                    println!(
+                        "ok {} {} {} ",
+                        p.x.round_dp(6),
+                        p.y.round_dp(6),
+                        p.z.round_dp(6)
+                    );
+                    */
                     parity += 1;
                 }
-                LinearPolygonRelation::IntersectEdge(s) => {
-                    let mut polygons = self.polygons();
-
-                    if let Some(ix1) = polygons
+                LinearPolygonRelation::IntersectEdge(s, p) => {
+                    let flipped = s.to_owned().flip();
+                    if !checked_edges
                         .iter()
-                        .position(|p| p.get_segments().iter().any(|ps| *ps == s))
+                        .any(|checked_segment| *checked_segment == flipped)
                     {
-                        let poly1 = polygons.swap_remove(ix1);
-                        let si = s.flip();
-                        if let Some(ix2) = polygons
-                            .iter()
-                            .position(|p| p.get_segments().iter().any(|ps| *ps == si))
-                        {
-                            let poly2 = polygons.swap_remove(ix2);
-                            let p1 = poly1
-                                .vertices
-                                .iter()
-                                .map(Clone::clone)
-                                .fold(Vector3::zeros(), |a, b| a + b)
-                                / Dec::from(poly1.vertices.len());
-                            let p2 = poly2
-                                .vertices
-                                .iter()
-                                .map(Clone::clone)
-                                .fold(Vector3::zeros(), |a, b| a + b)
-                                / Dec::from(poly2.vertices.len());
-                            let p1 = p1 - ray.origin;
-                            let p2 = p2 - ray.origin;
-                            let c1: Vector3<Dec> = ray.dir.cross(&p1);
-                            let c2 = ray.dir.cross(&p2);
+                        checked_edges.push(s.clone());
+                        let mut polygons = self.polygons().collect_vec();
+                        // This plane i a plane perpendicular to edge in point of intersection.
+                        // Project ray, and and faces vectors on this plane to remove problems with
+                        // non-strict crossing
+                        let plane = Plane::new_from_normal_and_point(s.dir().normalize(), p);
 
-                            if c1.dot(&c2).is_negative() {
-                                parity += 1;
+                        if let Some(ix1) = polygons
+                            .iter()
+                            .position(|p| p.get_segments().iter().any(|ps| *ps == s))
+                        {
+                            let poly1 = polygons.swap_remove(ix1);
+                            let si = s.flip();
+                            if let Some(ix2) = polygons
+                                .iter()
+                                .position(|p| p.get_segments().iter().any(|ps| *ps == si))
+                            {
+                                let poly2 = polygons.swap_remove(ix2);
+                                let p1 = poly1
+                                    .vertices
+                                    .iter()
+                                    .map(Clone::clone)
+                                    .fold(Vector3::zeros(), |a, b| a + b)
+                                    / Dec::from(poly1.vertices.len());
+                                let p2 = poly2
+                                    .vertices
+                                    .iter()
+                                    .map(Clone::clone)
+                                    .fold(Vector3::zeros(), |a, b| a + b)
+                                    / Dec::from(poly2.vertices.len());
+                                //println!("p1 {} {} {}", p1.x, p1.y, p1.z);
+                                //println!("p2 {} {} {}", p2.x, p2.y, p2.z);
+                                let p1 = p1 - p;
+                                let p2 = p2 - p;
+                                let p1_plane = p1 - plane.normal() * plane.normal().dot(&p1);
+                                let p2_plane = p2 - plane.normal() * plane.normal().dot(&p2);
+                                let ray_dir_plane = (ray.dir
+                                    - plane.normal() * plane.normal().dot(&ray.dir))
+                                .normalize();
+
+                                let p1p: Vector3<Dec> =
+                                    ray_dir_plane * ray_dir_plane.dot(&p1_plane);
+                                let p1n: Vector3<Dec> = (p1_plane - p1p).normalize();
+                                //dbg!(&p1p);
+                                //dbg!(&p1n);
+                                //dbg!(p1n + p1p);
+                                // dbg!(p1n.dot(&ray_dir_plane));
+                                // println!("wtf");
+                                if p1n.dot(&p2_plane).is_negative() {
+                                    parity += 1;
+                                }
+
+                                //panic!("dbg");
+                                //TODO Beware: when this ray hits segment, and both polygons on this
+                                //segment at 180 degree, This will fail
+                                /*
+                                if c1.dot(&c2).is_negative() {
+                                    dbg!(c1.dot(&c2));
+                                    parity += 1;
+                                }
+                                */
                             }
                         }
                     }
@@ -100,6 +146,7 @@ impl Relation<Vector3<Dec>> for Mesh {
                     let norm_dir = total_dir - dir_dir;
                     let norm_dir = norm_dir.normalize();
 
+                    // println!("possible problem #2");
                     if dirs.iter().all(|d| d.dot(&norm_dir).is_negative()) {
                         parity += 1;
                     }
@@ -116,6 +163,7 @@ impl Relation<Vector3<Dec>> for Mesh {
         }
 
         if parity % 2 == 1 {
+            // dbg!(parity);
             PointVolumeRelation::In
         } else {
             PointVolumeRelation::Out

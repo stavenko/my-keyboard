@@ -78,7 +78,6 @@ impl Relation<Vector3<Dec>> for Segment {
             .round_dp(STABILITY_ROUNDING)
             .is_zero()
         {
-            //dbg!(t0);
             if t0.is_negative() || t0 > Dec::one() {
                 PointOnLine::Outside
             } else if t0.is_zero() || t0.is_one() {

@@ -1,0 +1,266 @@
+use crate::indexes::aabb::Aabb;
+use itertools::Itertools;
+use nalgebra::Vector3;
+use num_traits::{Bounded, Zero};
+use rust_decimal_macros::dec;
+
+use crate::{decimal::Dec, primitives_relation::relation::Relation};
+
+use super::sphere::Sphere;
+
+const MAX_NODES: usize = 3;
+
+pub enum BoundRelation {
+    Intersects,
+    Unrelated,
+}
+
+pub enum BoundNodeRelation {
+    Inside,
+    Outside,
+}
+
+impl<T: Clone> Relation<Node<T>> for Sphere {
+    type Relate = BoundNodeRelation;
+
+    fn relate(&self, _to: &Node<T>) -> Self::Relate {
+        todo!()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Node<T: Clone> {
+    pub data: T,
+    pub point: Vector3<Dec>,
+}
+
+#[derive(Debug)]
+pub enum OctreeContent<T: Clone> {
+    Empty,
+    Quadrants([Box<Octree<T>>; 8]),
+    Container(Vec<Node<T>>),
+}
+
+#[derive(Debug)]
+pub struct Octree<T: Clone> {
+    aabb: Aabb,
+    contents: OctreeContent<T>,
+    quantification: usize,
+}
+
+impl<T: Clone> Default for Octree<T> {
+    fn default() -> Self {
+        Octree::empty(8)
+    }
+}
+
+impl<T: Clone> Octree<T> {
+    pub fn query_within_sphere(&self, bound: Sphere) -> Vec<Node<T>> {
+        match self.contents {
+            OctreeContent::Empty => Vec::new(),
+            OctreeContent::Container(ref items) => items
+                .iter()
+                .filter(|i| matches!(bound.relate(i), BoundNodeRelation::Inside))
+                .cloned()
+                .collect_vec(),
+            OctreeContent::Quadrants(ref qs) => qs
+                .iter()
+                .filter(|q| matches!(q.aabb.relate(&bound), BoundRelation::Intersects))
+                .flat_map(|q| q.query_within_sphere(bound))
+                .collect(),
+        }
+    }
+
+    pub fn query_within_aabb(&self, bound: Aabb) -> Vec<Node<T>> {
+        match self.contents {
+            OctreeContent::Empty => Vec::new(),
+            OctreeContent::Container(ref items) => items
+                .iter()
+                .filter(|i| matches!(bound.relate(*i), BoundNodeRelation::Inside))
+                .cloned()
+                .collect_vec(),
+            OctreeContent::Quadrants(ref qs) => qs
+                .iter()
+                .filter(|q| matches!(q.aabb.relate(&bound), BoundRelation::Intersects))
+                .flat_map(|q| q.query_within_aabb(bound))
+                .collect(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        matches!(self.contents, OctreeContent::Empty)
+    }
+
+    fn empty(quantification: usize) -> Self {
+        Self {
+            aabb: Aabb::default(),
+            contents: OctreeContent::Empty,
+            quantification,
+        }
+    }
+
+    fn container(v: Vec<Node<T>>, aabb: Aabb, quantification: usize) -> Self {
+        Self {
+            aabb,
+            contents: OctreeContent::Container(v),
+            quantification,
+        }
+    }
+
+    pub fn find(&self, node: Vector3<Dec>) -> Option<&Node<T>> {
+        match &self.contents {
+            OctreeContent::Empty => None,
+            OctreeContent::Quadrants(qs) => {
+                let ix = Self::index(&self.aabb, &node);
+                qs[ix].find(node)
+            }
+            OctreeContent::Container(items) => items.iter().find(|item| {
+                (item.point - node)
+                    .magnitude()
+                    .round_dp(self.quantification as u32)
+                    .is_zero()
+            }),
+        }
+    }
+    pub fn insert(&mut self, node: Node<T>) {
+        match &mut self.contents {
+            OctreeContent::Empty => {
+                self.contents = OctreeContent::Container(vec![node]);
+            }
+
+            OctreeContent::Container(ref mut v) => {
+                v.push(node);
+                if v.len() > MAX_NODES {
+                    let quadrants = Self::sort(v, &self.aabb)
+                        .map(|points| Box::new(Octree::new(points, self.quantification)));
+                    self.contents = OctreeContent::Quadrants(quadrants);
+                }
+            }
+
+            OctreeContent::Quadrants(quadrants) => {
+                let ix = Self::index(&self.aabb, &node.point);
+
+                quadrants[ix].insert(node);
+            }
+        }
+    }
+
+    pub fn rebalance(self) -> Self {
+        if let OctreeContent::Quadrants(_) = &self.contents {
+            let items = self.get_vec();
+            Self::new(items, self.quantification)
+        } else {
+            self
+        }
+    }
+
+    pub fn rebalance_mut(&mut self) {
+        if let OctreeContent::Quadrants(_) = &self.contents {
+            let items = self.get_vec();
+            *self = Self::new(items, self.quantification);
+        }
+    }
+
+    pub fn get_vec(&self) -> Vec<Node<T>> {
+        match &self.contents {
+            OctreeContent::Empty => Vec::new(),
+            OctreeContent::Container(v) => v.to_owned(),
+            OctreeContent::Quadrants(ref qs) => qs.iter().flat_map(|q| q.get_vec()).collect(),
+        }
+    }
+    /*
+
+    pub fn linearize(self) -> Vec<Vector3<Dec>> {
+        match self.contents {
+            OctreeContent::Empty => Vec::new(),
+            OctreeContent::Container(v) => vec![v],
+            OctreeContent::Quadrants(qs) => qs.into_iter().flat_map(|q| q.linearize()).collect(),
+        }
+    }
+
+    pub fn get_point_index(&self, p: &Vector3<Dec>) -> Option<usize> {
+        match &self.contents {
+            OctreeContent::Container(v) if (p - v).magnitude() < Dec::EPSILON => Some(0),
+            OctreeContent::Quadrants(qs) => {
+                let ix = Self::index(&self.middle, p);
+                let len_before: usize = qs.iter().take(ix).map(|q| q.get_length()).sum();
+                qs[ix].get_point_index(p).map(|p| p + len_before)
+            }
+            _ => None,
+        }
+    }
+    */
+
+    fn index(aabb: &Aabb, p: &Vector3<Dec>) -> usize {
+        let middle = aabb.min.lerp(&aabb.max, dec!(0.5).into());
+
+        #[allow(clippy::let_and_return)]
+        let ix = if p.x > middle.x { 1 << 2 } else { 0 }
+            + if p.y > middle.y { 1 << 1 } else { 0 }
+            + if p.z > middle.z { 1 } else { 0 };
+        ix
+    }
+
+    pub fn allocate<const Q: usize>(min: Vector3<Dec>, max: Vector3<Dec>) -> Self {
+        Self {
+            aabb: Aabb { min, max },
+            contents: OctreeContent::Empty,
+            quantification: Q,
+        }
+    }
+
+    pub fn allocate_default<const Q: usize>() -> Self {
+        Self {
+            aabb: Aabb::default(),
+            contents: OctreeContent::Empty,
+            quantification: Q,
+        }
+    }
+
+    fn sort(points: &Vec<Node<T>>, aabb: &Aabb) -> [Vec<Node<T>>; 8] {
+        let mut ars: [Vec<Node<T>>; 8] = Default::default();
+
+        for p in points {
+            let ix = Self::index(aabb, &p.point);
+            ars[ix].push(p.clone());
+        }
+        ars
+    }
+
+    pub fn new(nodes: Vec<Node<T>>, quantification: usize) -> Self {
+        let mut min: Vector3<Dec> = Vector3::new(
+            Bounded::max_value(),
+            Bounded::max_value(),
+            Bounded::max_value(),
+        );
+        let mut max: Vector3<Dec> = Vector3::new(
+            Bounded::min_value(),
+            Bounded::min_value(),
+            Bounded::min_value(),
+        );
+        for p in nodes.iter().map(|n| n.point) {
+            min.x = Ord::min(min.x, p.x);
+            min.y = Ord::min(min.y, p.y);
+            min.z = Ord::min(min.z, p.z);
+
+            max.x = Ord::max(max.x, p.x);
+            max.y = Ord::max(max.y, p.y);
+            max.z = Ord::max(max.z, p.z);
+        }
+
+        let aabb = Aabb { min, max };
+        if nodes.is_empty() {
+            Octree::empty(quantification)
+        } else if nodes.len() <= MAX_NODES {
+            Octree::container(nodes, aabb, quantification)
+        } else {
+            let quadrants =
+                Self::sort(&nodes, &aabb).map(|nodes| Box::new(Octree::new(nodes, quantification)));
+            Octree {
+                aabb,
+                contents: OctreeContent::Quadrants(quadrants),
+                quantification,
+            }
+        }
+    }
+}

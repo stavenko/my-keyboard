@@ -6,6 +6,7 @@ use num_traits::{Signed, Zero};
 
 use crate::{
     decimal::{Dec, STABILITY_ROUNDING},
+    edge::Edge,
     linear::{line::Line, ray::Ray, segment::Segment},
     planar::{plane::Plane, polygon::Polygon},
 };
@@ -13,7 +14,7 @@ use crate::{
 use super::{
     linear::{LinearIntersection, LinearRelation},
     linear_point::PointOnLine,
-    point_planar::{PointPlanarRelation, PointPolygonRelation},
+    point_planar::{PointEdgeRelation, PointPlanarRelation, PointPolygonRelation},
     relation::Relation,
 };
 
@@ -22,9 +23,6 @@ pub enum LinearPlanarRelation {
     Parallell,
     SamePlane,
     Intersect(Vector3<Dec>),
-    //IntersectVertex(Vector3<Dec>),
-    //IntersectEdge(Segment),
-    //IntersectInPlane(Vec<InPlane>),
     NonIntersecting,
 }
 
@@ -33,8 +31,8 @@ pub enum LinearPolygonRelation {
     Parallell,
     NonIntersecting,
 
-    IntersectEdge(Segment),
-    IntersectPlane(Vector3<Dec>),
+    IntersectEdge(Segment, Vector3<Dec>),
+    IntersectPlaneInside(Vector3<Dec>),
     IntersectVertex(Vector3<Dec>),
     IntersectInPlane {
         vertices: Vec<Vector3<Dec>>,
@@ -96,7 +94,7 @@ impl Relation<Polygon> for Ray {
                 for segment in to.get_segments() {
                     match segment.relate(&point) {
                         PointOnLine::On => {
-                            return LinearPolygonRelation::IntersectEdge(segment.clone())
+                            return LinearPolygonRelation::IntersectEdge(segment.clone(), point)
                         }
                         PointOnLine::Origin => {
                             return LinearPolygonRelation::IntersectVertex(point)
@@ -106,7 +104,7 @@ impl Relation<Polygon> for Ray {
                 }
 
                 if let PointPolygonRelation::In = to.relate(&point) {
-                    LinearPolygonRelation::IntersectPlane(point)
+                    LinearPolygonRelation::IntersectPlaneInside(point)
                 } else {
                     LinearPolygonRelation::NonIntersecting
                 }
@@ -181,7 +179,7 @@ impl Relation<Polygon> for Line {
                 for segment in to.get_segments() {
                     match segment.relate(&point) {
                         PointOnLine::On => {
-                            return LinearPolygonRelation::IntersectEdge(segment.clone())
+                            return LinearPolygonRelation::IntersectEdge(segment.clone(), point)
                         }
                         PointOnLine::Origin => {
                             return LinearPolygonRelation::IntersectVertex(point)
@@ -189,7 +187,102 @@ impl Relation<Polygon> for Line {
                         PointOnLine::Outside => {}
                     }
                 }
-                LinearPolygonRelation::IntersectPlane(point)
+                LinearPolygonRelation::IntersectPlaneInside(point)
+            }
+
+            LinearPlanarRelation::SamePlane => {
+                let mut common_edges: Vec<Segment> = Vec::new();
+                let mut edges: Vec<(Segment, Vector3<Dec>)> = Vec::new();
+                let mut vertices: Vec<Vector3<Dec>> = Vec::new();
+                for segment in to.get_segments() {
+                    match self.relate(&segment) {
+                        LinearRelation::Colinear => {
+                            for px in vertices
+                                .iter()
+                                .enumerate()
+                                .filter(|(_, &v)| segment.has(v))
+                                .map(|(ix, _)| ix)
+                                .rev()
+                                .collect_vec()
+                            {
+                                vertices.swap_remove(px);
+                            }
+                            common_edges.push(segment.clone());
+                        }
+
+                        LinearRelation::Opposite => {
+                            for px in vertices
+                                .iter()
+                                .enumerate()
+                                .filter(|(_, &v)| segment.has(v))
+                                .map(|(ix, _)| ix)
+                                .rev()
+                                .collect_vec()
+                            {
+                                vertices.swap_remove(px);
+                            }
+                            common_edges.push(segment.clone());
+                        }
+                        LinearRelation::Intersect(LinearIntersection::Origin(v)) => {
+                            if !common_edges.iter().any(|s| s.has(v))
+                                && !vertices
+                                    .iter()
+                                    .any(|x| (x - v).magnitude_squared().round_dp(7).is_zero())
+                            {
+                                vertices.push(v);
+                            }
+                        }
+                        LinearRelation::Intersect(LinearIntersection::In(v)) => {
+                            edges.push((segment.clone(), v))
+                        }
+                        _ => {
+                            //dbg!(x);
+                        }
+                    }
+                }
+
+                LinearPolygonRelation::IntersectInPlane {
+                    common_edges,
+                    edges,
+                    vertices,
+                }
+            }
+            // Ray in plane parallel to polygon
+            LinearPlanarRelation::Parallell => LinearPolygonRelation::Parallell,
+            // Ray looks away from polygon plane
+            LinearPlanarRelation::NonIntersecting => LinearPolygonRelation::NonIntersecting,
+        }
+    }
+}
+
+impl Relation<Edge> for Ray {
+    type Relate = LinearPolygonRelation;
+
+    fn relate(&self, to: &Edge) -> Self::Relate {
+        let plane = to.get_plane();
+        match self.relate(&plane) {
+            LinearPlanarRelation::Intersect(point) => {
+                for segment in to.get_segments() {
+                    match segment.relate(&point) {
+                        PointOnLine::On => {
+                            return LinearPolygonRelation::IntersectEdge(segment.clone(), point);
+                        }
+                        PointOnLine::Origin => {
+                            return LinearPolygonRelation::IntersectVertex(point)
+                        }
+                        PointOnLine::Outside => {}
+                    }
+                }
+
+                // This simple fact notifies us that, point in polygon
+                // is almost as point in `edge`, when we use ray intersection parity method.
+                // Edge holds all needed segments, thats why this method works
+                if let PointEdgeRelation::In = to.relate(&point) {
+                    // dbg!(&to.bound);
+                    LinearPolygonRelation::IntersectPlaneInside(point)
+                } else {
+                    LinearPolygonRelation::NonIntersecting
+                }
             }
 
             LinearPlanarRelation::SamePlane => {

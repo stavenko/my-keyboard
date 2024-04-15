@@ -163,7 +163,7 @@ fn uvw(i: usize, j: usize, d: usize) -> [Dec; 3] {
 impl Geometry for TriBezier {
     fn polygonize(&self) -> anyhow::Result<Vec<Polygon>> {
         let mut faces = Vec::new();
-        let details = 10;
+        let details = 5;
         for i in 1..=details {
             for j in 1..=details {
                 let ninj = uvw(i - 1, j - 1, details);

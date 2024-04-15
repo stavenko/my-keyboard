@@ -7,7 +7,7 @@ use std::{
 
 use approx::{AbsDiffEq, UlpsEq};
 use nalgebra::{ComplexField, Field, RealField, SimdValue};
-use num_traits::{pow::Pow, FromPrimitive, Num, Signed, ToPrimitive};
+use num_traits::{pow::Pow, Bounded, FromPrimitive, Num, Signed, ToPrimitive};
 use rust_decimal::{
     prelude::{One, Zero},
     Decimal, MathematicalOps,
@@ -19,7 +19,8 @@ use simba::scalar::{SubsetOf, SupersetOf};
 pub struct Dec(Decimal);
 
 pub const EPS: Dec = Dec(dec!(1e-8));
-pub const STABILITY_ROUNDING: u32 = 27;
+pub const STABILITY_ROUNDING: u32 = 14;
+pub const NORMAL_DOT_ROUNDING: u32 = 4;
 //pub const STABILITY_ROUNDING_F: u32 = 15;
 
 impl SubsetOf<Dec> for Dec {
@@ -137,7 +138,7 @@ impl ComplexField for Dec {
     }
 
     fn sin_cos(self) -> (Self, Self) {
-        todo!()
+        (Self(self.0.sin()), Self(self.0.cos()))
     }
 
     fn tan(self) -> Self {
@@ -273,11 +274,11 @@ impl RealField for Dec {
     }
 
     fn min_value() -> Option<Self> {
-        todo!()
+        Some(<Self as Bounded>::min_value())
     }
 
     fn max_value() -> Option<Self> {
-        todo!()
+        Some(<Self as Bounded>::max_value())
     }
 
     fn pi() -> Self {
@@ -756,16 +757,6 @@ impl Mul<Dec> for i64 {
     }
 }
 
-/*
-impl Mul<Vector3<Dec>> for Dec {
-    type Output = Vector3<Dec>;
-
-    fn mul(self, rhs: Vector3<Dec>) -> Self::Output {
-        self * rhs
-    }
-}
-*/
-
 impl From<Decimal> for Dec {
     fn from(value: Decimal) -> Self {
         Dec(value)
@@ -775,5 +766,15 @@ impl From<Decimal> for Dec {
 impl From<Dec> for Decimal {
     fn from(value: Dec) -> Self {
         value.0
+    }
+}
+
+impl Bounded for Dec {
+    fn min_value() -> Self {
+        Decimal::MIN.into()
+    }
+
+    fn max_value() -> Self {
+        Decimal::MAX.into()
     }
 }

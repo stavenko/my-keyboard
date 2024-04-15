@@ -1,8 +1,10 @@
+use itertools::Itertools;
 use nalgebra::Vector3;
 use num_traits::{Signed, Zero};
 
 use crate::{
-    decimal::{Dec, STABILITY_ROUNDING},
+    decimal::{Dec, NORMAL_DOT_ROUNDING, STABILITY_ROUNDING},
+    edge::Edge,
     linear::{line::Line, ray::Ray, segment::Segment},
     planar::{plane::Plane, polygon::Polygon},
 };
@@ -31,11 +33,21 @@ pub enum PointPolygonRelation {
     Vertex,
 }
 
+#[derive(PartialEq, Debug)]
+pub enum PointEdgeRelation {
+    In,
+    WithNormal,
+    OpposeToNormal,
+    InPlane,
+    Edge(Segment),
+    Vertex,
+}
+
 impl Relation<Vector3<Dec>> for Plane {
     type Relate = PointPlanarRelation;
 
     fn relate(&self, to: &Vector3<Dec>) -> Self::Relate {
-        let distance = (self.normal().dot(to) - self.d()).round_dp(STABILITY_ROUNDING - 2);
+        let distance = (self.normal().dot(to) - self.d()).round_dp(NORMAL_DOT_ROUNDING);
 
         if distance.is_zero() {
             PointPlanarRelation::In
@@ -124,6 +136,93 @@ impl Relation<Vector3<Dec>> for Polygon {
     }
 }
 
+impl Relation<Vector3<Dec>> for Edge {
+    type Relate = PointEdgeRelation;
+
+    fn relate(&self, to: &Vector3<Dec>) -> Self::Relate {
+        //println!("~~~~~~~~~~~~~edge to pt ~~~~~~");
+        match self.get_plane().relate(to) {
+            PointPlanarRelation::In => {
+                let ray = {
+                    let Line { dir, .. } = self.get_segments().next().unwrap().into();
+                    Ray { dir, origin: *to }
+                };
+
+                let mut edges_crossed = 0;
+                let mut vertices = Vec::new();
+                for segment in self.get_segments() {
+                    match segment.relate(to) {
+                        super::linear_point::PointOnLine::On => {
+                            return PointEdgeRelation::Edge(segment);
+                        }
+                        super::linear_point::PointOnLine::Origin => {
+                            return PointEdgeRelation::Vertex
+                        }
+                        super::linear_point::PointOnLine::Outside => {}
+                    }
+
+                    match ray.relate(&segment) {
+                        LinearRelation::Intersect(LinearIntersection::Origin(v)) => {
+                            vertices.push(v);
+                        }
+                        LinearRelation::Intersect(LinearIntersection::In(_)) => {
+                            // println!("-----------------=/=------------");
+                            edges_crossed += 1;
+                        }
+                        _ => {}
+                    }
+                }
+
+                let mut all_segments = self.get_segments().collect_vec();
+                for v in vertices {
+                    if let Some(p1) = all_segments.iter().position(|s| {
+                        (s.from - v)
+                            .magnitude_squared()
+                            .round_dp(STABILITY_ROUNDING)
+                            .is_zero()
+                    }) {
+                        let s1 = all_segments.swap_remove(p1);
+
+                        if let Some(p2) = all_segments.iter().position(|s| {
+                            (s.to - v)
+                                .magnitude_squared()
+                                .round_dp(STABILITY_ROUNDING - 2)
+                                .is_zero()
+                        }) {
+                            let s2 = all_segments.swap_remove(p2);
+                            let p1 = s1.to - v;
+                            let p2 = s2.from - v;
+                            let p1n = p1 - ray.dir * (ray.dir.dot(&p1));
+
+                            {
+                                //let p1n = p1n.normalize();
+                                //println!("{}", p1n.dot(&ray.dir));
+                                //println!("{}", p1n.dot(&p2).round_dp(6).is_negative());
+                            }
+
+                            //let c1 = ray.dir.cross(&p1);
+                            //let c2 = ray.dir.cross(&p2);
+
+                            if p1n.dot(&p2).round_dp(6).is_negative() {
+                                //println!("------------------/-------------");
+                                edges_crossed += 1;
+                            }
+                        }
+                    }
+                }
+
+                if edges_crossed % 2 == 1 {
+                    PointEdgeRelation::In
+                } else {
+                    PointEdgeRelation::InPlane
+                }
+            }
+            PointPlanarRelation::WithNormal => PointEdgeRelation::WithNormal,
+            PointPlanarRelation::OpposeToNormal => PointEdgeRelation::OpposeToNormal,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use nalgebra::Vector3;
@@ -152,7 +251,7 @@ mod tests {
         };
         assert_eq!(
             ray.relate(&poly),
-            LinearPolygonRelation::IntersectPlane(Vector3::x())
+            LinearPolygonRelation::IntersectPlaneInside(Vector3::x())
         );
     }
 }

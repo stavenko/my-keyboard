@@ -115,7 +115,6 @@ impl Relation<Plane> for Plane {
 
                 PlanarRelation::Intersect(Line { origin, dir })
             } else {
-                dbg!(x, y, z);
                 unreachable!();
             }
         }
@@ -188,14 +187,14 @@ impl Plane {
                     front.push(u);
                     back.push(u);
                 }
-                (PointPlanarRelation::WithNormal, PointPlanarRelation::WithNormal) => {
-                    //dbg!("both in front- no splits");
-                }
-                (PointPlanarRelation::OpposeToNormal, PointPlanarRelation::OpposeToNormal) => {
-                    //dbg!("both in back- no splits");
-                }
-                _ => {
-                    dbg!(&relation_current, &relation_next);
+                (PointPlanarRelation::WithNormal, PointPlanarRelation::WithNormal) => {}
+                (PointPlanarRelation::OpposeToNormal, PointPlanarRelation::OpposeToNormal) => {}
+                (PointPlanarRelation::OpposeToNormal, PointPlanarRelation::In) => {}
+                (PointPlanarRelation::WithNormal, PointPlanarRelation::In) => {}
+                (PointPlanarRelation::In, PointPlanarRelation::WithNormal) => {}
+                (PointPlanarRelation::In, PointPlanarRelation::OpposeToNormal) => {}
+                a => {
+                    dbg!(a);
                     unreachable!()
                 }
             }

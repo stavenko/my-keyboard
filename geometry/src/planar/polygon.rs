@@ -131,14 +131,8 @@ impl Polygon {
         let my_polygon_plane = other.get_plane();
 
         match tool_plane.relate(&my_polygon_plane) {
-            PlanarRelation::Opposite => {
-                dbg!("opposing planes");
-                None
-            }
-            PlanarRelation::Coplanar => {
-                dbg!("same_plane");
-                None
-            }
+            PlanarRelation::Opposite => None,
+            PlanarRelation::Coplanar => None,
             PlanarRelation::Parallel => None,
             PlanarRelation::Intersect(line) => match line.relate(other) {
                 LinearPolygonRelation::IntersectInPlane {
@@ -165,8 +159,8 @@ impl Polygon {
                     _ => None,
                 },
                 LinearPolygonRelation::Parallell => None,
-                LinearPolygonRelation::IntersectEdge(_) => None,
-                LinearPolygonRelation::IntersectPlane(_) => None,
+                LinearPolygonRelation::IntersectEdge(_, _) => None,
+                LinearPolygonRelation::IntersectPlaneInside(_) => None,
                 LinearPolygonRelation::IntersectVertex(_) => None,
                 LinearPolygonRelation::NonIntersecting => None,
             },
@@ -176,11 +170,8 @@ impl Polygon {
     fn is_segment_inside(&self, segment: &Segment) -> bool {
         let mut points = 0;
         //let pts = [segment.from, segment.to];
-        //dbg!("++++++++");
-        //dbg!(segment);
         match self.relate(&segment.from) {
             PointPolygonRelation::In => {
-                //dbg!("in f");
                 points += 1;
             }
             PointPolygonRelation::Vertex => {
@@ -190,7 +181,6 @@ impl Polygon {
                 }
             }
             PointPolygonRelation::Edge(_) => {
-                //dbg!("edge f");
                 let pp = segment.from + segment.dir() * Dec::from(dec!(0.000001));
                 if let PointPolygonRelation::In = self.relate(&pp) {
                     points += 1;
@@ -207,7 +197,6 @@ impl Polygon {
 
         match self.relate(&segment.to) {
             PointPolygonRelation::In => {
-                //dbg!("in t");
                 points += 1;
             }
             PointPolygonRelation::Vertex => {
@@ -217,7 +206,6 @@ impl Polygon {
                 }
             }
             PointPolygonRelation::Edge(_) => {
-                //dbg!("edge t");
                 let pp = segment.from + segment.dir() * Dec::from(dec!(0.999999));
                 if let PointPolygonRelation::In = self.relate(&pp) {
                     points += 1;
@@ -231,8 +219,6 @@ impl Polygon {
             }
             PointPolygonRelation::InPlane => {}
         }
-        //dbg!("--- --- ---");
-        //dbg!(points);
 
         points == 2
     }
@@ -259,26 +245,13 @@ impl Polygon {
                 let tool_line = tool.get_line();
 
                 match tool_line.relate(&my_segment) {
-                    LinearRelation::Parallell => {
-                        //dbg!("parallel");
-                    }
-                    LinearRelation::Crossed { .. } => {
-                        //dbg!("crossed");
-                    }
-                    LinearRelation::Colinear => {
-                        //dbg!("colinear");
-                    }
-                    LinearRelation::Opposite => {
-                        //dbg!("opposite");
-                    }
-                    LinearRelation::Intersect(LinearIntersection::Origin(_point)) => {
-                        //dbg!("intersect in origin");
-                    }
+                    LinearRelation::Parallell => {}
+                    LinearRelation::Crossed { .. } => {}
+                    LinearRelation::Colinear => {}
+                    LinearRelation::Opposite => {}
+                    LinearRelation::Intersect(LinearIntersection::Origin(_point)) => {}
                     LinearRelation::Intersect(LinearIntersection::In(point)) => {
-                        //dbg!("sss");
-                        //dbg!(tool.relate(&point));
                         if !matches!(tool.relate(&point), PointOnLine::Outside) {
-                            //dbg!("segments intersected", point);
                             let s1 = Segment {
                                 from: my_segment.from,
                                 to: point,
@@ -292,9 +265,7 @@ impl Polygon {
                             continue 'my;
                         }
                     }
-                    LinearRelation::Independent => {
-                        //dbg!("Independent");
-                    }
+                    LinearRelation::Independent => {}
                 }
             }
             // no cut - push
@@ -444,21 +415,6 @@ impl Polygon {
             .try_collect()
     }
 
-    /*
-    pub fn triangles(self) -> Vec<Face> {
-        let mut result = Vec::new();
-        for i in 1..(self.vertices.len() - 1) {
-            let v0 = self.vertices[0];
-            let v1 = self.vertices[i];
-            let v2 = self.vertices[i + 1];
-
-            result.push(Face::new_with_normal([v0, v1, v2], self.plane.normal()));
-        }
-
-        result
-    }
-    */
-
     pub fn new(vertices: Vec<Vector3<Dec>>) -> anyhow::Result<Self> {
         let plane = Self::calculate_plane(&vertices)?;
         Ok(Self { vertices, plane })
@@ -508,13 +464,20 @@ impl Polygon {
         }
 
         let my_segments = self.split_my_segments_by(tool);
+        dbg!(my_segments.len());
         let tool_segments = tool.split_my_segments_by(self);
+        dbg!(tool_segments.len());
 
         let my_segments = tool.drop_full_insides(my_segments);
+        dbg!(my_segments.len());
         let tool_segments = self.drop_full_insides(tool_segments);
+        dbg!(tool_segments.len());
         let joined = [my_segments, tool_segments].concat();
 
+        dbg!(joined.len());
         let segments = Self::filter_duplicates_and_opposites(joined);
+        dbg!(&segments);
+
         Self::from_segments(segments).unwrap()
     }
 
@@ -603,6 +566,14 @@ impl Polygon {
 
     pub fn boolean_intersecion(self, _other: Self) -> Option<Self> {
         todo!("implement boolean_intersecion")
+    }
+
+    pub(crate) fn middle(&self) -> Vector3<Dec> {
+        self.vertices
+            .iter()
+            .map(ToOwned::to_owned)
+            .fold(Vector3::zeros(), |a, b| a + b)
+            / Dec::from(self.vertices.len())
     }
 }
 
@@ -721,7 +692,6 @@ mod tests {
 
         let polygons = poly1.clone().boolean_diff(&poly2.flip());
 
-        dbg!(polygons[0].vertices.len());
         assert_eq!(polygons[0], poly1);
     }
 
@@ -835,7 +805,6 @@ mod tests {
             Vector3::new(dec!(0).into(), dec!(1).into(), dec!(0).into()),
         ];
         let pp = Polygon::new(vv.to_vec()).unwrap();
-        dbg!(polygons[0].vertices.len());
         assert_eq!(polygons[0], pp);
     }
 

@@ -1,12 +1,11 @@
 use nalgebra::Vector3;
 use num_traits::Zero;
-use stl_io::{Triangle, Vector};
 
 use crate::decimal::Dec;
 
 use super::plane::Plane;
 
-pub struct TriangleWrap(Triangle);
+//pub struct TriangleWrap(Triangle);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Face {
@@ -30,13 +29,13 @@ impl Face {
     pub fn new(vertices: [Vector3<Dec>; 3]) -> Self {
         let [u, v, w] = &vertices;
         let _origin = *u;
-        let a = (v - u);
-        let b = (w - u);
+        let a = v - u;
+        let b = w - u;
 
         let cross = a.cross(&b);
 
-        if dbg!(cross.magnitude_squared().is_zero()) {
-            dbg!(a.dot(&b));
+        if cross.magnitude_squared().is_zero() {
+            dbg!(a.normalize().dot(&b.normalize()));
             panic!("aaa {u} , {v} , {w} ({a} x {b} , {cross}");
         }
         let normal = cross.normalize();
@@ -44,6 +43,7 @@ impl Face {
     }
 }
 
+/*
 impl From<Face> for TriangleWrap {
     fn from(value: Face) -> Self {
         let normal = value.get_normal();
@@ -54,3 +54,4 @@ impl From<Face> for TriangleWrap {
         TriangleWrap(Triangle { normal, vertices })
     }
 }
+*/

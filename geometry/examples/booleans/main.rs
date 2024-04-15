@@ -49,7 +49,81 @@ fn bigger_by_smaller(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
     stl_io::write_stl(&mut writer, result.into_iter())?;
     Ok(vec![filename.into()])
 }
+fn smaller_by_bigger(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
+    let zz = Vector3::z();
+    let yy = Vector3::y();
+    let xx = yy.cross(&zz).normalize();
 
+    let _zero_basis = Basis::new(xx, yy, zz, Vector3::zeros())?;
+
+    let smaller_box = shapes::rect(
+        _zero_basis.clone(),
+        Dec::one() * 1,
+        Dec::one() * 1,
+        Dec::one() * 1,
+    );
+
+    let bigger_box = shapes::rect(_zero_basis, Dec::one() * 2, Dec::one() * 2, Dec::one() * 2);
+
+    let result = smaller_box.boolean_union(bigger_box).remove(0);
+
+    let filename = "smaller_by_bigger.stl";
+    let path = file_root.join(filename);
+    let mut writer = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(path)
+        .unwrap();
+
+    stl_io::write_stl(&mut writer, result.into_iter())?;
+    Ok(vec![filename.into()])
+}
+
+fn two_identical_boxes_with_overlapped_side_and_rotated(
+    file_root: PathBuf,
+) -> anyhow::Result<Vec<String>> {
+    let x_basis_one = Basis::new(Vector3::x(), Vector3::y(), Vector3::z(), Vector3::zeros())?;
+
+    let box_one = shapes::rect(
+        x_basis_one,
+        Dec::one() * Dec::from(1.),
+        Dec::one() * Dec::from(1.),
+        Dec::one() * Dec::from(1.),
+    );
+    let rot = UnitQuaternion::from_axis_angle(
+        &UnitVector3::new_normalize(Vector3::x()),
+        Dec::from(std::f32::consts::FRAC_PI_4),
+    );
+
+    let x_basis_two = Basis::new(
+        Vector3::x(),
+        rot * Vector3::y(),
+        rot * Vector3::z(),
+        Vector3::x() * (Dec::one() * Dec::from(0.5)),
+    )?;
+
+    let box_two = shapes::rect(
+        x_basis_two,
+        Dec::one() * Dec::from(1.),
+        Dec::one() * Dec::from(1.),
+        Dec::one() * Dec::from(1.),
+    );
+
+    let result = box_one.boolean_union(box_two).remove(0);
+
+    let filename = "one_with_rotated_overlapped_side.stl";
+    let path = file_root.join(filename);
+    let mut writer = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(path)
+        .unwrap();
+
+    stl_io::write_stl(&mut writer, result.into_iter())?;
+    Ok(vec![filename.into()])
+}
 fn two_identical_boxes_one_with_one_common_side_rotated(
     file_root: PathBuf,
 ) -> anyhow::Result<Vec<String>> {
@@ -70,7 +144,7 @@ fn two_identical_boxes_one_with_one_common_side_rotated(
         Vector3::x(),
         rot * Vector3::y(),
         rot * Vector3::z(),
-        Vector3::x() * (Dec::one() * Dec::from(0.7)),
+        Vector3::x() * (Dec::one() * Dec::from(1.0)),
     )?;
 
     let box_two = shapes::rect(
@@ -145,7 +219,7 @@ fn two_identical_boxes_one_with_overlap(file_root: PathBuf) -> anyhow::Result<Ve
         Vector3::x(),
         Vector3::y(),
         Vector3::z(),
-        Vector3::x() * (Dec::one() * Dec::from(0.7).round_dp(STABILITY_ROUNDING)),
+        Vector3::x() * (Dec::one() * Dec::from(0.4).round_dp(STABILITY_ROUNDING)),
     )?;
 
     let box_two = shapes::rect(
@@ -183,8 +257,8 @@ fn two_identical_boxes_one_shifted_in_plane(file_root: PathBuf) -> anyhow::Resul
         Vector3::x(),
         Vector3::y(),
         Vector3::z(),
-        Vector3::x() * Dec::from(dec!(0.9)).round_dp(3)
-            + Vector3::y() * Dec::from(dec!(0.9)).round_dp(3),
+        Vector3::x() * Dec::from(dec!(0.7)).round_dp(3)
+            + Vector3::y() * Dec::from(dec!(0.6)).round_dp(3),
     )?;
 
     let box_two = shapes::rect(
@@ -222,8 +296,8 @@ fn two_identical_boxes_one_shifted_in_space(file_root: PathBuf) -> anyhow::Resul
         Vector3::x(),
         Vector3::y(),
         Vector3::z(),
-        Vector3::x() * Dec::from(dec!(0.9))
-            + Vector3::y() * Dec::from(dec!(0.9))
+        Vector3::x() * Dec::from(dec!(0.5))
+            + Vector3::y() * Dec::from(dec!(0.6))
             + Vector3::z() * Dec::from(dec!(0.9)),
     )?;
 
@@ -457,10 +531,14 @@ fn main() -> Result<(), anyhow::Error> {
 
     fs::create_dir_all(cli.output_path.clone())?;
     let paths = vec![
+        /*
+         */
         bigger_by_smaller(cli.output_path.clone())?,
+        smaller_by_bigger(cli.output_path.clone())?,
         two_identical_boxes_one_with_one_common_side(cli.output_path.clone())?,
-        two_identical_boxes_one_with_one_common_side_rotated(cli.output_path.clone())?,
         two_identical_boxes_one_with_overlap(cli.output_path.clone())?,
+        two_identical_boxes_one_with_one_common_side_rotated(cli.output_path.clone())?,
+        two_identical_boxes_with_overlapped_side_and_rotated(cli.output_path.clone())?,
         two_identical_boxes_one_shifted_in_plane(cli.output_path.clone())?,
         two_identical_boxes_one_shifted_in_space(cli.output_path.clone())?,
         bigger_box_extended_by_smaller(cli.output_path.clone())?,
@@ -468,6 +546,8 @@ fn main() -> Result<(), anyhow::Error> {
         smaller_box_cutted_by_bigger(cli.output_path.clone())?,
         smaller_box_cutted_by_bigger_in_two(cli.output_path.clone())?,
         smaller_box_cutted_by_longer(cli.output_path.clone())?,
+        /*
+         */
     ]
     .concat();
 
@@ -478,7 +558,7 @@ fn main() -> Result<(), anyhow::Error> {
         let x = grid_size * (w as f32 - (grid as f32 / 2.0));
         for h in 0..grid {
             let y = grid_size * (h as f32 - (grid as f32 / 2.0));
-            let i = dbg!(h + (w * grid));
+            let i = h + (w * grid);
             if let Some(path) = paths.get(i as usize) {
                 scad.push(format!(
                     "translate(v=[{}, {}, 0]) {{ import(\"{}\"); }}",
@@ -491,7 +571,6 @@ fn main() -> Result<(), anyhow::Error> {
     }
 
     let file_content = scad.join("\n");
-    println!("{}", file_content);
 
     fs::write(cli.output_path.join("tot.scad"), file_content).unwrap();
 

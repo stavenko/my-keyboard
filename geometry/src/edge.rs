@@ -1,5 +1,7 @@
-use crate::planar::face::Face;
-use crate::spatial_index_2d::Index;
+use crate::{
+    indexes::quadtree::Quadtree,
+    planar::{face::Face, plane::Plane},
+};
 use core::fmt;
 
 use itertools::Itertools;
@@ -8,34 +10,40 @@ use stl_io::{Triangle, Vector};
 use tap::TapFallible;
 
 use crate::{
-    decimal::Dec,
-    linear::segment::Segment,
-    planar::{plane::Plane, polygon::Polygon},
-    polygon_basis::PolygonBasis,
+    decimal::Dec, linear::segment::Segment, planar::polygon::Polygon, polygon_basis::PolygonBasis,
 };
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Edge {
-    pub plane: Plane,
-    pub polygons: Vec<Polygon>,
+    pub bound: Polygon,
+    pub holes: Vec<Polygon>,
 }
 
 impl fmt::Debug for Edge {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Edge")
-            .field("plane", &self.plane)
-            .field("polygons_len", &self.polygons.len())
+            .field("plane", &self.bound.get_plane())
+            .field("holes", &self.holes.len())
             .finish()
     }
 }
 
 impl Edge {
-    pub fn get_segments(&self) -> Vec<Segment> {
-        self.polygons
-            .iter()
-            .flat_map(|p| p.get_segments())
-            .collect()
+    pub fn get_segments(&self) -> impl Iterator<Item = Segment> + '_ {
+        self.bound
+            .get_segments()
+            .into_iter()
+            .chain(self.holes.iter().flat_map(|p| p.get_segments()))
     }
+
+    pub(crate) fn polygons_ref(&self) -> impl Iterator<Item = &Polygon> {
+        [&self.bound].into_iter().chain(self.holes.iter())
+    }
+
+    pub(crate) fn polygons_owned(self) -> impl Iterator<Item = Polygon> {
+        [self.bound].into_iter().chain(self.holes)
+    }
+    /*
 
     pub fn join_polygons_on_side(mut self) -> Option<Self> {
         let segments = self
@@ -60,33 +68,30 @@ impl Edge {
             None
         }
     }
+    */
 
     fn get_common_basis(&self) -> PolygonBasis {
         // we got plane, so we at least have one point
         //
-        let u = self.plane.normal() * self.plane.d();
-        let Some(v) = self
-            .polygons
-            .iter()
-            .flat_map(|p| p.vertices.iter())
-            .find(|v| **v != u)
-        else {
+        let plane = self.bound.get_plane();
+        let u = plane.normal() * plane.d();
+        let Some(v) = self.bound.vertices.iter().find(|v| **v != u) else {
             panic!(
-                "With {} polygons we cannot find point, that differs from one vertex on plane",
-                self.polygons.len()
+                "Cannot find point in main polygon, that is not origin of polygons plane. And I need this point",
             );
         };
 
         let x = (v - u).normalize();
-        let y = self.plane.normal().cross(&x).normalize();
+        let y = plane.normal().cross(&x).normalize();
         PolygonBasis { center: u, x, y }
     }
 
     pub fn triangles(&self) -> anyhow::Result<Vec<Triangle>> {
-        let mut index = Index::default();
+        let mut index = Quadtree::default();
         let mut contours = Vec::new();
         let basis = self.get_common_basis();
-        self.polygons.iter().for_each(|poly| {
+
+        self.polygons_ref().for_each(|poly| {
             let segments = poly.get_segments_2d(&basis);
 
             for s in &segments {
@@ -155,8 +160,12 @@ impl Edge {
 
     pub(crate) fn from_polygon(p: Polygon) -> Self {
         Self {
-            plane: p.get_plane(),
-            polygons: vec![p],
+            bound: p,
+            holes: Vec::new(),
         }
+    }
+
+    pub(crate) fn get_plane(&self) -> Plane {
+        self.bound.get_plane()
     }
 }

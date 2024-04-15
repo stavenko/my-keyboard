@@ -18,10 +18,12 @@ nalgebra = "0.32.3"
 num-traits = "0.2.17"
 rand = "0.8.5"
 rayon = "1.8.0"
+rstar = "0.12.0"
 rust_decimal = { version = "1.33.1", features = ["maths"] }
 rust_decimal_macros = "1.33.1"
 seq-macro = "0.3.5"
 simba = { version = "0.8.1", features = ["decimal"] }
 stl_io = "0.7.0"
 tap = "1.0.1"
+uuid = { version = "1.8.0", features = ["v4"] }
 

@@ -1,3 +1,4 @@
+/*
 use crate::{planar::polygon::Polygon, volume::mesh::Mesh};
 
 use super::relation::Relation;
@@ -44,3 +45,4 @@ impl Relation<Polygon> for Mesh {
         }
     }
 }
+*/

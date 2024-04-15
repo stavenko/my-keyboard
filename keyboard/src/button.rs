@@ -37,58 +37,66 @@ impl Button {
     }
 
     pub(crate) fn inner_left_bottom(&self, thickness: Dec) -> Vector3<Dec> {
-        let left = self.origin.left() * (self.mount.padding + self.mount.width / Dec::from(2.0));
-        let top = self.origin.y() * (self.mount.padding + self.mount.height / Dec::from(2.0));
-        let up = self.origin.z() * thickness / Dec::from(2.0);
+        let left =
+            self.origin.left() * (self.mount.padding + self.mount.width / Dec::from(dec!(2)));
+        let top = self.origin.y() * (self.mount.padding + self.mount.height / Dec::from(dec!(2)));
+        let up = self.origin.z() * thickness / Dec::from(dec!(2));
         left - top - up + self.origin.center
     }
 
     pub(crate) fn inner_left_top(&self, thickness: Dec) -> Vector3<Dec> {
-        let left = self.origin.left() * (self.mount.padding + self.mount.width / Dec::from(2.0));
-        let top = self.origin.top() * (self.mount.padding + self.mount.height / Dec::from(2.0));
-        let up = self.origin.z() * thickness / Dec::from(2.0);
+        let left =
+            self.origin.left() * (self.mount.padding + self.mount.width / Dec::from(dec!(2)));
+        let top = self.origin.top() * (self.mount.padding + self.mount.height / Dec::from(dec!(2)));
+        let up = self.origin.z() * thickness / Dec::from(dec!(2));
         left + top - up + self.origin.center
     }
 
     pub(crate) fn outer_left_bottom(&self, thickness: Dec) -> Vector3<Dec> {
-        let left = self.origin.left() * (self.mount.padding + self.mount.width / Dec::from(2.0));
-        let top = self.origin.top() * (self.mount.padding + self.mount.height / Dec::from(2.0));
-        let up = self.origin.z() * thickness / Dec::from(2.0);
+        let left =
+            self.origin.left() * (self.mount.padding + self.mount.width / Dec::from(dec!(2)));
+        let top = self.origin.top() * (self.mount.padding + self.mount.height / Dec::from(dec!(2)));
+        let up = self.origin.z() * thickness / Dec::from(dec!(2));
         left - top + up + self.origin.center
     }
 
     pub(crate) fn outer_left_top(&self, thickness: Dec) -> Vector3<Dec> {
-        let left = self.origin.left() * (self.mount.padding + self.mount.width / Dec::from(2.0));
-        let top = self.origin.top() * (self.mount.padding + self.mount.height / Dec::from(2.0));
-        let up = self.origin.z() * thickness / Dec::from(2.0);
+        let left =
+            self.origin.left() * (self.mount.padding + self.mount.width / Dec::from(dec!(2)));
+        let top = self.origin.top() * (self.mount.padding + self.mount.height / Dec::from(dec!(2)));
+        let up = self.origin.z() * thickness / Dec::from(dec!(2));
         left + top + up + self.origin.center
     }
 
     pub(crate) fn inner_right_bottom(&self, thickness: Dec) -> Vector3<Dec> {
-        let right = self.origin.right() * (self.mount.padding + self.mount.width / Dec::from(2.0));
-        let top = self.origin.top() * (self.mount.padding + self.mount.height / Dec::from(2.0));
-        let up = self.origin.z() * thickness / Dec::from(2.0);
+        let right =
+            self.origin.right() * (self.mount.padding + self.mount.width / Dec::from(dec!(2)));
+        let top = self.origin.top() * (self.mount.padding + self.mount.height / Dec::from(dec!(2)));
+        let up = self.origin.z() * thickness / Dec::from(dec!(2));
         right - top - up + self.origin.center
     }
 
     pub(crate) fn inner_right_top(&self, thickness: Dec) -> Vector3<Dec> {
-        let right = self.origin.right() * (self.mount.padding + self.mount.width / Dec::from(2.0));
-        let top = self.origin.top() * (self.mount.padding + self.mount.height / Dec::from(2.0));
-        let up = self.origin.z() * thickness / Dec::from(2.0);
+        let right =
+            self.origin.right() * (self.mount.padding + self.mount.width / Dec::from(dec!(2)));
+        let top = self.origin.top() * (self.mount.padding + self.mount.height / Dec::from(dec!(2)));
+        let up = self.origin.z() * thickness / Dec::from(dec!(2));
         right + top - up + self.origin.center
     }
 
     pub(crate) fn outer_right_bottom(&self, thickness: Dec) -> Vector3<Dec> {
-        let right = self.origin.right() * (self.mount.padding + self.mount.width / Dec::from(2.0));
-        let top = self.origin.top() * (self.mount.padding + self.mount.height / Dec::from(2.0));
-        let up = self.origin.z() * thickness / Dec::from(2.0);
+        let right =
+            self.origin.right() * (self.mount.padding + self.mount.width / Dec::from(dec!(2)));
+        let top = self.origin.top() * (self.mount.padding + self.mount.height / Dec::from(dec!(2)));
+        let up = self.origin.z() * thickness / Dec::from(dec!(2));
         right - top + up + self.origin.center
     }
 
     pub(crate) fn outer_right_top(&self, thickness: Dec) -> Vector3<Dec> {
-        let right = self.origin.right() * (self.mount.padding + self.mount.width / Dec::from(2.0));
-        let top = self.origin.top() * (self.mount.padding + self.mount.height / Dec::from(2.0));
-        let up = self.origin.z() * thickness / Dec::from(2.0);
+        let right =
+            self.origin.right() * (self.mount.padding + self.mount.width / Dec::from(dec!(2)));
+        let top = self.origin.top() * (self.mount.padding + self.mount.height / Dec::from(dec!(2)));
+        let up = self.origin.z() * thickness / Dec::from(dec!(2));
         right + top + up + self.origin.center
     }
 }

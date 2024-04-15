@@ -1,14 +1,37 @@
+use std::fmt;
+
 use crate::decimal::Dec;
 use nalgebra::Vector3;
 
 use super::{Path, PathInverse};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct EdgeSegment {
     pub from: Vector3<Dec>,
     pub to: Vector3<Dec>,
     pub edge_from: Vector3<Dec>,
     pub edge_to: Vector3<Dec>,
+}
+
+impl fmt::Debug for EdgeSegment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "\n{}… {}… {}… -> {}… {}… {}…\n ⇧{}, {}, {}, ⇩{}, {}, {}",
+            self.from.x.round_dp(4),
+            self.from.y.round_dp(4),
+            self.from.z.round_dp(4),
+            self.to.x.round_dp(4),
+            self.to.y.round_dp(4),
+            self.to.z.round_dp(4),
+            self.edge_from.x.round_dp(4),
+            self.edge_from.y.round_dp(4),
+            self.edge_from.z.round_dp(4),
+            self.edge_to.x.round_dp(4),
+            self.edge_to.y.round_dp(4),
+            self.edge_to.z.round_dp(4)
+        )
+    }
 }
 
 impl PathInverse for EdgeSegment {
