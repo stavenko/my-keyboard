@@ -42,6 +42,18 @@ impl Aabb {
 
         Aabb { min, max }
     }
+
+    pub(crate) fn merge(mut self, aabb: Aabb) -> Aabb {
+        self.min.x = self.min.x.min(aabb.min.x);
+        self.min.y = self.min.y.min(aabb.min.y);
+        self.min.z = self.min.x.min(aabb.min.z);
+
+        self.max.x = self.max.x.max(aabb.max.x);
+        self.max.y = self.max.y.max(aabb.max.y);
+        self.max.z = self.max.x.max(aabb.max.z);
+
+        self
+    }
 }
 
 impl Relation<Sphere> for Aabb {

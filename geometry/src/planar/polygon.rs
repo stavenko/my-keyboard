@@ -13,7 +13,6 @@ use crate::{
     polygon_basis::PolygonBasis,
     primitives_relation::{
         linear::{LinearIntersection, LinearRelation},
-        linear_planar::LinearPolygonRelation,
         linear_point::PointOnLine,
         planar::PlanarRelation,
         point_planar::PointPolygonRelation,
@@ -126,6 +125,7 @@ impl Polygon {
         items.join("\n")
     }
 
+    /*
     pub fn split(&self, other: &Self) -> Option<(Self, Self)> {
         let tool_plane = self.get_plane();
         let my_polygon_plane = other.get_plane();
@@ -159,13 +159,14 @@ impl Polygon {
                     _ => None,
                 },
                 LinearPolygonRelation::Parallell => None,
-                LinearPolygonRelation::IntersectEdge(_, _) => None,
+                LinearPolygonRelation::IntersectRib(_, _) => None,
                 LinearPolygonRelation::IntersectPlaneInside(_) => None,
                 LinearPolygonRelation::IntersectVertex(_) => None,
                 LinearPolygonRelation::NonIntersecting => None,
             },
         }
     }
+    */
 
     fn is_segment_inside(&self, segment: &Segment) -> bool {
         let mut points = 0;
@@ -981,6 +982,7 @@ mod tests {
         assert_eq!(polygons[0], smaller);
     }
 
+    /*
     #[test]
     fn splitting_diagonals() {
         let debug_poly_my = Polygon::new(
@@ -1094,6 +1096,7 @@ mod tests {
         // assert_eq!(f, r1);
         //assert_eq!(b, r2);
     }
+    */
 
     #[test]
     fn boolean_union_adjacent_but_not_fully() {

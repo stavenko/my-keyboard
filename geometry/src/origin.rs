@@ -1,4 +1,4 @@
-use nalgebra::{UnitQuaternion, Vector3};
+use nalgebra::{Matrix4, UnitQuaternion, Vector3};
 use num_traits::Zero;
 
 use super::decimal::Dec;
@@ -82,8 +82,20 @@ impl Origin {
     pub fn z(&self) -> Vector3<Dec> {
         self.rotation * Vector3::z()
     }
-    pub fn add(&mut self, origin: &Origin) {
-        self.center = origin.rotation * (self.center + origin.center);
-        self.rotation *= origin.rotation;
+
+    pub fn get_matrix(&self) -> Matrix4<Dec> {
+        let m = self.rotation.to_rotation_matrix().to_homogeneous();
+        m * Matrix4::new_translation(&self.center)
+    }
+
+    pub fn apply(&mut self, origin: &Origin) {
+        //---
+
+        //let m = self.get_matrix();
+        //let om = origin.get_matrix();
+        //let mm = m * om;
+        // ---
+        self.center = origin.rotation * (self.center) + origin.center;
+        self.rotation = origin.rotation * self.rotation;
     }
 }

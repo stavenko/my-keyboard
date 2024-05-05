@@ -92,11 +92,6 @@ pub struct PointInPlane<T> {
     pub dir: Option<Vector3<T>>,
 }
 
-pub struct Segments {
-    segments: usize,
-    current_segment: usize,
-}
-
 pub struct IndexIterator<const D: usize>(usize);
 
 impl<const D: usize> Iterator for IndexIterator<D> {
@@ -122,6 +117,11 @@ impl<const D: usize> IndexIterator<D> {
     pub fn new() -> Self {
         Self(0)
     }
+}
+
+pub struct Segments {
+    segments: usize,
+    current_segment: usize,
 }
 
 impl Segments {

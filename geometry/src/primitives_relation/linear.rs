@@ -3,6 +3,7 @@ use num_traits::{One, Signed, Zero};
 
 use crate::{
     decimal::{Dec, NORMAL_DOT_ROUNDING, STABILITY_ROUNDING},
+    indexes::{geo_index::seg::SegRef, vertex_index::PtId},
     linear::{line::Line, ray::Ray, segment::Segment},
 };
 
@@ -22,9 +23,28 @@ pub enum LinearRelation {
 }
 
 #[derive(PartialEq, Debug)]
+pub enum LinearRefRelation {
+    Parallell,
+    Crossed {
+        this: Vector3<Dec>,
+        to: Vector3<Dec>,
+    },
+    Colinear,
+    Opposite,
+    Intersect(LinearRefIntersection),
+    Independent,
+}
+
+#[derive(PartialEq, Debug)]
 pub enum LinearIntersection {
     In(Vector3<Dec>),
     Origin(Vector3<Dec>),
+}
+
+#[derive(PartialEq, Debug)]
+pub enum LinearRefIntersection {
+    In(Vector3<Dec>),
+    Origin(PtId),
 }
 
 impl Relation<Line> for Line {
@@ -115,6 +135,63 @@ impl Relation<Ray> for Line {
             }
         } else {
             LinearRelation::Parallell
+        }
+    }
+}
+
+impl<'a> Relation<SegRef<'a>> for Line {
+    type Relate = LinearRefRelation;
+    fn relate(&self, to: &SegRef<'a>) -> Self::Relate {
+        let segment_dir = to.dir().normalize();
+        let dot = (self.dir.dot(&segment_dir)).round_dp(STABILITY_ROUNDING - 1);
+        let q = self.origin - to.from();
+
+        if dot.abs().is_one() {
+            let magnitude_squared = q.magnitude_squared().round_dp(NORMAL_DOT_ROUNDING).sqrt();
+            let point_dot = q.dot(&self.dir).abs().round_dp(NORMAL_DOT_ROUNDING);
+            if (point_dot - magnitude_squared)
+                .round_dp(NORMAL_DOT_ROUNDING)
+                .is_zero()
+            {
+                return if dot.is_positive() {
+                    LinearRefRelation::Colinear
+                } else {
+                    LinearRefRelation::Opposite
+                };
+            }
+        }
+        let dot = self.dir.dot(&segment_dir).round_dp(STABILITY_ROUNDING);
+        //dbg!(dot.round_dp(STABILITY_ROUNDING));
+
+        let m = Matrix2::new(Dec::from(1), -dot, dot, -Dec::from(1));
+        let b = -Vector2::new(q.dot(&self.dir), q.dot(&segment_dir));
+
+        if let Some(mi) = m.try_inverse() {
+            let st = mi * b;
+            let p1 = self.origin + self.dir * st.x;
+            let p2 = to.from() + segment_dir * st.y;
+            if (p1 - p2)
+                .magnitude_squared()
+                .round_dp(STABILITY_ROUNDING)
+                .is_zero()
+            {
+                let segment_len = to.dir().magnitude().round_dp(NORMAL_DOT_ROUNDING);
+                let y = (st.y / segment_len).round_dp(NORMAL_DOT_ROUNDING);
+
+                if y.is_negative() || y > Dec::one() {
+                    LinearRefRelation::Independent
+                } else if y.is_zero() {
+                    LinearRefRelation::Intersect(LinearRefIntersection::Origin(to.from_pt()))
+                } else if y.is_one() {
+                    LinearRefRelation::Intersect(LinearRefIntersection::Origin(to.to_pt()))
+                } else {
+                    LinearRefRelation::Intersect(LinearRefIntersection::In(p1))
+                }
+            } else {
+                LinearRefRelation::Crossed { this: p1, to: p2 }
+            }
+        } else {
+            LinearRefRelation::Parallell
         }
     }
 }
@@ -228,6 +305,61 @@ impl Relation<Segment> for Ray {
     }
 }
 
+impl<'a> Relation<SegRef<'a>> for Ray {
+    type Relate = LinearRefRelation;
+    fn relate(&self, to: &SegRef<'a>) -> Self::Relate {
+        let segment_dir = to.dir().normalize();
+        let dot = (self.dir.dot(&segment_dir)).round_dp(STABILITY_ROUNDING - 1);
+        let q = self.origin - to.from();
+        if dot.abs().is_one() {
+            let magnitude_squared = q.magnitude();
+            let point_dot = q.dot(&self.dir).abs();
+            if (point_dot - magnitude_squared)
+                .round_dp(STABILITY_ROUNDING)
+                .is_zero()
+            {
+                return if dot.is_positive() {
+                    LinearRefRelation::Colinear
+                } else {
+                    LinearRefRelation::Opposite
+                };
+            }
+        }
+
+        let dot = self.dir.dot(&segment_dir).round_dp(STABILITY_ROUNDING - 1);
+
+        let m = Matrix2::new(Dec::from(1), -dot, dot, -Dec::from(1));
+        let b = -Vector2::new(q.dot(&self.dir), q.dot(&segment_dir));
+
+        if let Some(mi) = m.try_inverse() {
+            let st = mi * b;
+            let p1 = self.origin + self.dir * st.x;
+            let p2 = to.from() + segment_dir * st.y;
+            if (p1 - p2)
+                .magnitude_squared()
+                .round_dp(STABILITY_ROUNDING)
+                .is_zero()
+            {
+                let segment_len = to.dir().magnitude().round_dp(STABILITY_ROUNDING);
+                let y = (st.y / segment_len).round_dp(STABILITY_ROUNDING - 3);
+
+                if y.is_negative() || y > Dec::one() || st.x.is_negative() {
+                    LinearRefRelation::Independent
+                } else if y.is_zero() {
+                    LinearRefRelation::Intersect(LinearRefIntersection::Origin(to.from_pt()))
+                } else if y.is_one() {
+                    LinearRefRelation::Intersect(LinearRefIntersection::Origin(to.to_pt()))
+                } else {
+                    LinearRefRelation::Intersect(LinearRefIntersection::In(p1))
+                }
+            } else {
+                LinearRefRelation::Crossed { this: p1, to: p2 }
+            }
+        } else {
+            LinearRefRelation::Parallell
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use std::ops::Neg;

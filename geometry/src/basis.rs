@@ -2,6 +2,7 @@ use crate::planar::plane::Plane;
 use core::fmt;
 
 use nalgebra::{Vector2, Vector3};
+use num_traits::One;
 
 use crate::decimal::Dec;
 
@@ -9,10 +10,10 @@ use super::polygon_basis::PolygonBasis;
 
 #[derive(Clone)]
 pub struct Basis {
-    center: Vector3<Dec>,
-    x: Vector3<Dec>,
-    y: Vector3<Dec>,
-    z: Vector3<Dec>,
+    pub center: Vector3<Dec>,
+    pub x: Vector3<Dec>,
+    pub y: Vector3<Dec>,
+    pub z: Vector3<Dec>,
 }
 
 impl fmt::Debug for Basis {
@@ -24,7 +25,7 @@ impl fmt::Debug for Basis {
         )?;
         writeln!(f, "  x {} {} {}", self.x.x, self.x.y, self.x.z)?;
         writeln!(f, "  y {} {} {}", self.y.x, self.y.y, self.y.z)?;
-        writeln!(f, "  y {} {} {}", self.z.x, self.z.y, self.z.z)?;
+        writeln!(f, "  z {} {} {}", self.z.x, self.z.y, self.z.z)?;
         Ok(())
     }
 }
@@ -49,7 +50,7 @@ impl Basis {
         center: Vector3<Dec>,
     ) -> anyhow::Result<Self> {
         let cross = z.cross(&x);
-        if cross != y {
+        if !cross.dot(&y).round_dp(6).is_one() {
             Err(anyhow::anyhow!("None-right basis is not supported"))
         } else {
             Ok(Self { center, x, y, z })

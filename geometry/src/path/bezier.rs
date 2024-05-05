@@ -95,6 +95,7 @@ impl Path for BezierEdge {
             .map(|(v, w)| v * w)
             .sum()
     }
+
     fn get_t(&self, t: Dec) -> Vector3<Dec> {
         let ot = Dec::one() - t;
         let weights = [

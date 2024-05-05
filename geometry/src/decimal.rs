@@ -1,12 +1,12 @@
-use core::{fmt, panic};
 use std::{
     cmp::Ordering,
+    fmt,
     iter::{Product, Sum},
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign},
 };
 
 use approx::{AbsDiffEq, UlpsEq};
-use nalgebra::{ComplexField, Field, RealField, SimdValue};
+use nalgebra::{ComplexField, Field, RealField, SimdValue, Vector3};
 use num_traits::{pow::Pow, Bounded, FromPrimitive, Num, Signed, ToPrimitive};
 use rust_decimal::{
     prelude::{One, Zero},
@@ -15,8 +15,14 @@ use rust_decimal::{
 use rust_decimal_macros::dec;
 use simba::scalar::{SubsetOf, SupersetOf};
 
-#[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Clone, Copy, Default)]
+#[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Clone, Copy, Default)]
 pub struct Dec(Decimal);
+
+impl fmt::Debug for Dec {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Dec: {}", self.round_dp(5))
+    }
+}
 
 pub const EPS: Dec = Dec(dec!(1e-8));
 pub const STABILITY_ROUNDING: u32 = 14;
@@ -34,6 +40,46 @@ impl SubsetOf<Dec> for Dec {
 
     fn is_in_subset(_element: &Dec) -> bool {
         true
+    }
+}
+
+impl Pow<usize> for Dec {
+    type Output = Dec;
+
+    fn pow(self, rhs: usize) -> Self::Output {
+        Dec(self.0.powu(rhs as u64))
+    }
+}
+
+impl Pow<u64> for Dec {
+    type Output = Dec;
+
+    fn pow(self, rhs: u64) -> Self::Output {
+        Dec(self.0.powu(rhs))
+    }
+}
+
+impl Pow<u16> for Dec {
+    type Output = Dec;
+
+    fn pow(self, rhs: u16) -> Self::Output {
+        Dec(self.0.powu(rhs as u64))
+    }
+}
+
+impl Pow<i64> for Dec {
+    type Output = Dec;
+
+    fn pow(self, rhs: i64) -> Self::Output {
+        Dec(self.0.powi(rhs))
+    }
+}
+
+impl Mul<Vector3<Dec>> for Dec {
+    type Output = Vector3<Dec>;
+
+    fn mul(self, rhs: Vector3<Dec>) -> Self::Output {
+        self * rhs
     }
 }
 
@@ -514,6 +560,7 @@ impl From<Dec> for u32 {
         })
     }
 }
+
 impl From<Dec> for f64 {
     fn from(value: Dec) -> Self {
         value.0.to_f64().unwrap_or_else(|| {
@@ -522,6 +569,7 @@ impl From<Dec> for f64 {
         })
     }
 }
+
 impl From<Dec> for f32 {
     fn from(value: Dec) -> Self {
         value.0.to_f32().unwrap_or_else(|| {
@@ -576,6 +624,17 @@ impl From<u32> for Dec {
         }))
     }
 }
+
+impl From<u16> for Dec {
+    fn from(value: u16) -> Self {
+        Self(Decimal::from_u16(value).unwrap_or_else(|| {
+            println!("WARNING: Cannot convert integer u32 to decimal `{value}`, setting 0");
+
+            Decimal::zero()
+        }))
+    }
+}
+
 impl From<usize> for Dec {
     fn from(value: usize) -> Self {
         Self(Decimal::from_usize(value).unwrap_or_else(|| {
@@ -586,6 +645,7 @@ impl From<usize> for Dec {
     }
 }
 
+/*
 impl<RHS> Pow<RHS> for Dec
 where
     Decimal: Pow<RHS, Output = Decimal>,
@@ -596,6 +656,7 @@ where
         Self(self.0.pow(rhs))
     }
 }
+*/
 
 impl Zero for Dec {
     fn zero() -> Self {
@@ -654,6 +715,7 @@ impl SubAssign for Dec {
         self.0 -= rhs.0;
     }
 }
+
 impl MulAssign for Dec {
     fn mul_assign(&mut self, rhs: Self) {
         self.0 *= rhs.0;
@@ -754,6 +816,38 @@ impl Mul<Dec> for i64 {
 
     fn mul(self, rhs: Dec) -> Self::Output {
         Dec::from(self) * rhs
+    }
+}
+
+impl Mul<Dec> for f64 {
+    type Output = Dec;
+
+    fn mul(self, rhs: Dec) -> Self::Output {
+        (Dec::from(self) * rhs).round_dp(8)
+    }
+}
+
+impl Mul<Dec> for f32 {
+    type Output = Dec;
+
+    fn mul(self, rhs: Dec) -> Self::Output {
+        (Dec::from(self) * rhs).round_dp(10)
+    }
+}
+
+impl Mul<f64> for Dec {
+    type Output = Dec;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        (Dec::from(rhs) * self).round_dp(8)
+    }
+}
+
+impl Mul<f32> for Dec {
+    type Output = Dec;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        (Dec::from(rhs) * self).round_dp(10)
     }
 }
 

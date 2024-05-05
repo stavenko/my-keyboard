@@ -6,15 +6,24 @@ use num_traits::{Signed, Zero};
 
 use crate::{
     decimal::{Dec, STABILITY_ROUNDING},
-    edge::Edge,
+    //edge::Edge,
+    indexes::{
+        geo_index::{
+            poly::PolyRef,
+            rib::{RibId, RibRef},
+        },
+        vertex_index::PtId,
+    },
     linear::{line::Line, ray::Ray, segment::Segment},
     planar::{plane::Plane, polygon::Polygon},
 };
 
 use super::{
-    linear::{LinearIntersection, LinearRelation},
+    linear::{LinearIntersection, LinearRefIntersection, LinearRefRelation, LinearRelation},
     linear_point::PointOnLine,
-    point_planar::{PointEdgeRelation, PointPlanarRelation, PointPolygonRelation},
+    point_planar::{
+        PointEdgeRelation, PointPlanarRelation, PointPolygonRefRelation, PointPolygonRelation,
+    },
     relation::Relation,
 };
 
@@ -31,13 +40,28 @@ pub enum LinearPolygonRelation {
     Parallell,
     NonIntersecting,
 
-    IntersectEdge(Segment, Vector3<Dec>),
+    IntersectRib(RibId, Vector3<Dec>),
     IntersectPlaneInside(Vector3<Dec>),
     IntersectVertex(Vector3<Dec>),
     IntersectInPlane {
         vertices: Vec<Vector3<Dec>>,
         edges: Vec<(Segment, Vector3<Dec>)>,
         common_edges: Vec<Segment>,
+    },
+}
+
+#[derive(Debug, PartialEq)]
+pub enum LinearPolygonRefRelation {
+    Parallell,
+    NonIntersecting,
+
+    IntersectRib(RibId, Vector3<Dec>),
+    IntersectPlaneInside(Vector3<Dec>),
+    IntersectVertex(Vector3<Dec>),
+    IntersectInPlane {
+        vertices: Vec<PtId>,
+        ribs: Vec<(RibId, Vector3<Dec>)>,
+        common_ribs: Vec<RibId>,
     },
 }
 
@@ -84,6 +108,95 @@ impl Relation<Plane> for Ray {
     }
 }
 
+impl<'a> Relation<PolyRef<'a>> for Ray {
+    type Relate = LinearPolygonRefRelation;
+
+    fn relate(&self, to: &PolyRef<'a>) -> Self::Relate {
+        let plane = to.get_plane();
+        match self.relate(&plane) {
+            LinearPlanarRelation::Intersect(point) => {
+                if to.is_vertex_in_polygon_bounds(point) {
+                    for rib in to.ribs() {
+                        match rib.relate(&point) {
+                            PointOnLine::On => {
+                                return LinearPolygonRefRelation::IntersectRib(*rib, point)
+                            }
+                            PointOnLine::Origin => {
+                                return LinearPolygonRefRelation::IntersectVertex(point)
+                            }
+                            PointOnLine::Outside => {}
+                        }
+                    }
+
+                    if let PointPolygonRefRelation::In = to.relate(&point) {
+                        LinearPolygonRefRelation::IntersectPlaneInside(point)
+                    } else {
+                        LinearPolygonRefRelation::NonIntersecting
+                    }
+                } else {
+                    LinearPolygonRefRelation::NonIntersecting
+                }
+            }
+
+            LinearPlanarRelation::SamePlane => {
+                let mut common_ribs: Vec<RibRef<'a>> = Vec::new();
+                let mut ribs: Vec<(RibRef<'a>, Vector3<Dec>)> = Vec::new();
+                let mut vertices: Vec<PtId> = Vec::new();
+                for segment in to.segments_iter() {
+                    match self.relate(&segment) {
+                        LinearRefRelation::Colinear => {
+                            for px in vertices
+                                .iter()
+                                .enumerate()
+                                .filter(|(_, &v)| segment.has(v))
+                                .map(|(ix, _)| ix)
+                                .rev()
+                                .collect_vec()
+                            {
+                                vertices.swap_remove(px);
+                            }
+                            common_ribs.push(segment.rib());
+                        }
+
+                        LinearRefRelation::Opposite => {
+                            for px in vertices
+                                .iter()
+                                .enumerate()
+                                .filter(|(_, &v)| segment.has(v))
+                                .map(|(ix, _)| ix)
+                                .rev()
+                                .collect_vec()
+                            {
+                                vertices.swap_remove(px);
+                            }
+                            common_ribs.push(segment.rib());
+                        }
+                        LinearRefRelation::Intersect(LinearRefIntersection::Origin(pt_id)) => {
+                            if !common_ribs.iter().any(|rib| rib.has(pt_id)) {
+                                vertices.push(pt_id);
+                            }
+                        }
+                        LinearRefRelation::Intersect(LinearRefIntersection::In(v)) => {
+                            ribs.push((segment.rib(), v))
+                        }
+                        _ => {}
+                    }
+                }
+
+                LinearPolygonRefRelation::IntersectInPlane {
+                    common_ribs: common_ribs.into_iter().map(|i| *i).collect_vec(),
+                    ribs: ribs.into_iter().map(|(i, b)| (*i, b)).collect_vec(),
+                    vertices,
+                }
+            }
+            // Ray in plane parallel to polygon
+            LinearPlanarRelation::Parallell => LinearPolygonRefRelation::Parallell,
+            // Ray looks away from polygon plane
+            LinearPlanarRelation::NonIntersecting => LinearPolygonRefRelation::NonIntersecting,
+        }
+    }
+}
+/*
 impl Relation<Polygon> for Ray {
     type Relate = LinearPolygonRelation;
 
@@ -168,7 +281,93 @@ impl Relation<Polygon> for Ray {
         }
     }
 }
+*/
 
+impl<'a> Relation<PolyRef<'a>> for Line {
+    type Relate = LinearPolygonRefRelation;
+
+    fn relate(&self, to: &PolyRef<'a>) -> Self::Relate {
+        let plane = to.get_plane();
+        match self.relate(&plane) {
+            LinearPlanarRelation::Intersect(point) => {
+                for segment in to.get_segments() {
+                    match segment.relate(&point) {
+                        PointOnLine::On => {
+                            return LinearPolygonRefRelation::IntersectRib(*segment.rib(), point)
+                        }
+                        PointOnLine::Origin => {
+                            return LinearPolygonRefRelation::IntersectVertex(point)
+                        }
+                        PointOnLine::Outside => {}
+                    }
+                }
+                LinearPolygonRefRelation::IntersectPlaneInside(point)
+            }
+
+            LinearPlanarRelation::SamePlane => {
+                let mut common_ribs: Vec<RibRef<'a>> = Vec::new();
+                let mut ribs: Vec<(RibId, Vector3<Dec>)> = Vec::new();
+                let mut vertices: Vec<PtId> = Vec::new();
+                for segment in to.get_segments() {
+                    match self.relate(&segment) {
+                        LinearRefRelation::Colinear => {
+                            for px in vertices
+                                .iter()
+                                .enumerate()
+                                .filter(|(_, &v)| segment.has(v))
+                                .map(|(ix, _)| ix)
+                                .rev()
+                                .collect_vec()
+                            {
+                                vertices.swap_remove(px);
+                            }
+                            common_ribs.push(segment.rib());
+                        }
+
+                        LinearRefRelation::Opposite => {
+                            for px in vertices
+                                .iter()
+                                .enumerate()
+                                .filter(|(_, &v)| segment.has(v))
+                                .map(|(ix, _)| ix)
+                                .rev()
+                                .collect_vec()
+                            {
+                                vertices.swap_remove(px);
+                            }
+                            common_ribs.push(segment.rib());
+                        }
+                        LinearRefRelation::Intersect(LinearRefIntersection::Origin(v)) => {
+                            if !common_ribs.iter().any(|s| s.has(v))
+                                && !vertices.iter().any(|&x| x == v)
+                            {
+                                vertices.push(v);
+                            }
+                        }
+                        LinearRefRelation::Intersect(LinearRefIntersection::In(v)) => {
+                            ribs.push((*segment.rib(), v))
+                        }
+                        _ => {
+                            //dbg!(x);
+                        }
+                    }
+                }
+
+                LinearPolygonRefRelation::IntersectInPlane {
+                    common_ribs: common_ribs.into_iter().map(|r| *r).collect_vec(),
+                    ribs,
+                    vertices,
+                }
+            }
+            // Ray in plane parallel to polygon
+            LinearPlanarRelation::Parallell => LinearPolygonRefRelation::Parallell,
+            // Ray looks away from polygon plane
+            LinearPlanarRelation::NonIntersecting => LinearPolygonRefRelation::NonIntersecting,
+        }
+    }
+}
+
+/*
 impl Relation<Polygon> for Line {
     type Relate = LinearPolygonRelation;
 
@@ -254,7 +453,9 @@ impl Relation<Polygon> for Line {
         }
     }
 }
+*/
 
+/*
 impl Relation<Edge> for Ray {
     type Relate = LinearPolygonRelation;
 
@@ -343,3 +544,4 @@ impl Relation<Edge> for Ray {
         }
     }
 }
+*/

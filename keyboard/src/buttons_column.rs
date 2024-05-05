@@ -1,51 +1,33 @@
 use geometry::origin::Origin;
 
+use crate::buttons_column_builder::ButtonsColumnBuilder;
+
 use super::button::Button;
 
 #[derive(Clone, Debug)]
 pub struct ButtonsColumn {
-    buttons: Vec<Button>,
-    top_button_ix: usize,
-    bottom_button_ix: usize,
-    pub(crate) origin: Origin,
+    pub(super) buttons: Vec<Button>,
 }
 
 impl ButtonsColumn {
-    pub(crate) fn new(origin: Origin) -> Self {
-        Self {
-            top_button_ix: 0,
-            origin,
-            bottom_button_ix: 0,
-            buttons: Vec::new(),
-        }
+    pub fn build() -> ButtonsColumnBuilder {
+        ButtonsColumnBuilder::default()
     }
 
-    pub(crate) fn chocs(mut self, buttons: Vec<Button>) -> Self {
-        self.buttons = buttons;
-        self.bottom_button_ix = self.buttons.len() - 1;
-        self
-    }
-
-    pub(crate) fn buttons(&self) -> Box<dyn Iterator<Item = Button> + '_> {
-        Box::new(self.buttons.iter().cloned().map(|mut b| {
-            b.origin.add(&self.origin);
-            b
-        }))
+    pub(crate) fn buttons(&self) -> impl Iterator<Item = &Button> {
+        self.buttons.iter()
     }
 
     pub(crate) fn top(&self) -> Option<Button> {
-        self.buttons.get(self.top_button_ix).cloned().map(|mut b| {
-            b.origin.add(&self.origin);
-            b
-        })
+        self.buttons.first().cloned()
     }
+
     pub(crate) fn bottom(&self) -> Option<Button> {
-        self.buttons
-            .get(self.bottom_button_ix)
-            .cloned()
-            .map(|mut b| {
-                b.origin.add(&self.origin);
-                b
-            })
+        self.buttons.last().cloned()
+    }
+    pub(crate) fn apply_origin(&mut self, origin: &Origin) {
+        for b in self.buttons.iter_mut() {
+            b.origin.apply(origin);
+        }
     }
 }

@@ -1,18 +1,20 @@
-use std::iter::empty;
-
 use geometry::origin::Origin;
 
-use super::{button::Button, ButtonsColumn};
+use crate::{
+    button::Button, button_collection_builder::ButtonsCollectionBuilder,
+    buttons_column::ButtonsColumn,
+};
 
 #[derive(Debug)]
 #[allow(unused)]
 pub struct ButtonsCollection {
-    pub origin: Origin,
-    columns: Vec<ButtonsColumn>,
-    first_column_ix: usize,
-    last_column_ix: usize,
+    //pub origin: Origin,
+    pub(crate) columns: Vec<ButtonsColumn>,
+    //first_column_ix: usize,
+    //last_column_ix: usize,
 }
 
+/*
 impl ButtonsHull for ButtonsCollection {
     fn buttons(&self) -> Box<dyn Iterator<Item = Button> + '_> {
         Box::new(
@@ -72,8 +74,23 @@ impl ButtonsHull for ButtonsCollection {
         })
     }
 }
+    */
 
 impl ButtonsCollection {
+    pub fn build() -> ButtonsCollectionBuilder {
+        ButtonsCollectionBuilder::default()
+    }
+
+    pub(crate) fn empty() -> ButtonsCollection {
+        Self {
+            columns: Vec::new(),
+        }
+    }
+
+    pub(crate) fn buttons(&self) -> impl Iterator<Item = &Button> {
+        self.columns.iter().flat_map(|col| col.buttons())
+    }
+    /*
     pub fn with_columns(mut self, columns: Vec<ButtonsColumn>) -> Self {
         self.columns = columns;
         self.last_column_ix = self.columns.len() - 1;
@@ -97,8 +114,10 @@ impl ButtonsCollection {
             None
         }
     }
+    */
 }
 
+/*
 pub trait ButtonsHull {
     fn columns(&self) -> impl Iterator<Item = ButtonsColumn> + '_;
 
@@ -111,3 +130,4 @@ pub trait ButtonsHull {
 
     fn bottom_buttons(&self) -> Box<dyn Iterator<Item = Button> + '_>;
 }
+*/

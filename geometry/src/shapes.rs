@@ -1,9 +1,9 @@
-use crate::{basis::Basis, decimal::Dec, edge::Edge, planar::polygon::Polygon, volume::mesh::Mesh};
+use crate::{basis::Basis, decimal::Dec, planar::polygon::Polygon};
 use nalgebra::{ComplexField, Vector3};
 use num_traits::Zero;
 use rust_decimal::Decimal;
 
-pub fn rect(b: Basis, w: Dec, h: Dec, d: Dec) -> Mesh {
+pub fn rect(b: Basis, w: Dec, h: Dec, d: Dec) -> Vec<Polygon> {
     let ww: Vector3<Dec> = b.x() * (w / 2);
     let hh: Vector3<Dec> = b.y() * (h / 2);
     let dd: Vector3<Dec> = b.z() * (d / 2);
@@ -57,17 +57,10 @@ pub fn rect(b: Basis, w: Dec, h: Dec, d: Dec) -> Mesh {
         far_basis.center() + hh + ww,
     ])
     .unwrap();
-    Mesh::new(vec![
-        Edge::from_polygon(top),
-        Edge::from_polygon(bottom),
-        Edge::from_polygon(right),
-        Edge::from_polygon(left),
-        Edge::from_polygon(near),
-        Edge::from_polygon(far),
-    ])
+    vec![top, bottom, right, left, near, far]
 }
 
-pub fn cylinder(b: Basis, h: Dec, r: Dec, s: usize) -> Mesh {
+pub fn cylinder(b: Basis, h: Dec, r: Dec, s: usize) -> Vec<Polygon> {
     let hh: Vector3<Dec> = b.y() * (h / 2);
 
     let top_basis = Basis::new(b.x(), -b.z(), b.y(), b.center() + hh).unwrap();
@@ -94,25 +87,13 @@ pub fn cylinder(b: Basis, h: Dec, r: Dec, s: usize) -> Mesh {
             + bottom_basis.x() * ap.cos() * r
             + bottom_basis.y() * ap.sin() * r;
 
-        //let u = apt;
-        //let v = ant;
-        //let w = anb;
-        //let a = v - u;
-        //let b = w - u;
-        //let z = a.cross(&b).normalize();
-        //let y = a.normalize();
-        //let x = z.cross(&y).normalize();
-
-        //let basis = Basis::new(x, z, y, (apt + apb + anb + ant) / Dec::from(4)).unwrap();
-        wall.push(Edge::from_polygon(
-            Polygon::new(vec![apt, ant, anb, apb]).unwrap(),
-        ));
+        wall.push(Polygon::new(vec![apt, ant, anb, apb]).unwrap());
         top.push(apt);
         bottom.push(bottom_point);
     }
-    wall.push(Edge::from_polygon(Polygon::new(top).unwrap()));
+    wall.push(Polygon::new(top).unwrap());
 
-    wall.push(Edge::from_polygon(Polygon::new(bottom).unwrap()));
+    wall.push(Polygon::new(bottom).unwrap());
 
-    Mesh::new(wall)
+    wall
 }

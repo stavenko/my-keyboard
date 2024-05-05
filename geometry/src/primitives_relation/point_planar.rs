@@ -4,13 +4,18 @@ use num_traits::{Signed, Zero};
 
 use crate::{
     decimal::{Dec, NORMAL_DOT_ROUNDING, STABILITY_ROUNDING},
-    edge::Edge,
+    // edge::Edge,
+    indexes::{
+        geo_index::{poly::PolyRef, rib::RibId},
+        vertex_index::PtId,
+    },
     linear::{line::Line, ray::Ray, segment::Segment},
     planar::{plane::Plane, polygon::Polygon},
 };
 
 use super::{
-    linear::{LinearIntersection, LinearRelation},
+    linear::{LinearIntersection, LinearRefIntersection, LinearRefRelation, LinearRelation},
+    point_volume::is_ray_between_rays,
     relation::Relation,
 };
 
@@ -30,6 +35,16 @@ pub enum PointPolygonRelation {
     OpposeToNormal,
     InPlane,
     Edge(Segment),
+    Vertex,
+}
+
+#[derive(PartialEq, Debug)]
+pub enum PointPolygonRefRelation {
+    In,
+    WithNormal,
+    OpposeToNormal,
+    InPlane,
+    Rib(RibId),
     Vertex,
 }
 
@@ -63,6 +78,7 @@ impl Relation<Vector3<Dec>> for Polygon {
     type Relate = PointPolygonRelation;
 
     fn relate(&self, to: &Vector3<Dec>) -> Self::Relate {
+        dbg!("THIS SHIT IS CALLED");
         match self.get_plane().relate(to) {
             PointPlanarRelation::In => {
                 let ray = {
@@ -136,6 +152,7 @@ impl Relation<Vector3<Dec>> for Polygon {
     }
 }
 
+/*
 impl Relation<Vector3<Dec>> for Edge {
     type Relate = PointEdgeRelation;
 
@@ -222,7 +239,126 @@ impl Relation<Vector3<Dec>> for Edge {
         }
     }
 }
+*/
 
+impl<'a> Relation<Vector3<Dec>> for PolyRef<'a> {
+    type Relate = PointPolygonRefRelation;
+
+    fn relate(&self, to: &Vector3<Dec>) -> Self::Relate {
+        match self.get_plane().relate(to) {
+            PointPlanarRelation::In => {
+                if !self.is_vertex_in_polygon_bounds(*to) {
+                    return PointPolygonRefRelation::InPlane;
+                }
+
+                let ray = {
+                    let dir = self
+                        .segments_iter()
+                        .next()
+                        .expect("At least one segment in polygon")
+                        .clone()
+                        .dir()
+                        .normalize();
+
+                    Ray { dir, origin: *to }
+                };
+
+                let mut edges_crossed = 0;
+                let mut vertices = Vec::new();
+                for segment in self.segments_iter() {
+                    match segment.relate(to) {
+                        super::linear_point::PointOnLine::On => {
+                            return PointPolygonRefRelation::Rib(*segment.rib());
+                        }
+                        super::linear_point::PointOnLine::Origin => {
+                            return PointPolygonRefRelation::Vertex
+                        }
+                        super::linear_point::PointOnLine::Outside => {}
+                    }
+
+                    match ray.relate(&segment) {
+                        LinearRefRelation::Intersect(LinearRefIntersection::Origin(v)) => {
+                            vertices.push(v);
+                        }
+                        LinearRefRelation::Intersect(LinearRefIntersection::In(_)) => {
+                            //dbg!("in");
+                            edges_crossed += 1;
+                        }
+                        _ => {}
+                    }
+                }
+
+                // println!(">>>>>>>>>{}>>>>>>>>>>>>>", vertices.len());
+                for v in vertices {
+                    if let Ok([rib1, rib2]) = <Vec<PtId> as TryInto<[PtId; 2]>>::try_into(
+                        self.ribs()
+                            .filter(|rib| rib.has(v))
+                            .flat_map(|r| [r.from_pt(), r.to_pt()])
+                            .filter(|rib_vertex| *rib_vertex != v)
+                            .collect::<Vec<PtId>>(),
+                    ) {
+                        let root = self.get_vertex(v);
+                        let rib1 = self.get_vertex(rib1);
+                        let rib2 = self.get_vertex(rib2);
+                        //dbg!(ray.dir);
+                        let rib1 = rib1 - root;
+                        let rib2 = rib2 - root;
+                        //dbg!(rib1);
+                        //dbg!(rib2);
+                        if is_ray_between_rays(
+                            self.get_plane().normal(),
+                            ray.dir,
+                            rib1.normalize(),
+                            rib2.normalize(),
+                        ) {
+                            //dbg!("v");
+                            edges_crossed += 1;
+                        }
+                    }
+                }
+
+                /*
+                if let Some(p1) = all_segments.iter().position(|s| {
+                    (s.from - v)
+                        .magnitude_squared()
+                        .round_dp(STABILITY_ROUNDING)
+                        .is_zero()
+                }) {
+                    let s1 = all_segments.swap_remove(p1);
+
+                    if let Some(p2) = all_segments.iter().position(|s| {
+                        (s.to - v)
+                            .magnitude_squared()
+                            .round_dp(STABILITY_ROUNDING - 2)
+                            .is_zero()
+                    }) {
+                        let s2 = all_segments.swap_remove(p2);
+                        let p1 = s1.to - ray.origin;
+                        let p2 = s2.from - ray.origin;
+
+                        let c1 = ray.dir.cross(&p1);
+                        let c2 = ray.dir.cross(&p2);
+
+                        if c1.dot(&c2).is_negative() {
+                            dbg!("edge");
+                            edges_crossed += 1;
+                        }
+                    }
+                }
+                */
+
+                if edges_crossed % 2 == 1 {
+                    // println!(">>------{edges_crossed}---------->>>>");
+                    PointPolygonRefRelation::In
+                } else {
+                    PointPolygonRefRelation::InPlane
+                }
+            }
+            PointPlanarRelation::WithNormal => PointPolygonRefRelation::WithNormal,
+            PointPlanarRelation::OpposeToNormal => PointPolygonRefRelation::OpposeToNormal,
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use nalgebra::Vector3;
@@ -234,6 +370,7 @@ mod tests {
         primitives_relation::{linear_planar::LinearPolygonRelation, relation::Relation},
     };
 
+    /*
     #[test]
     fn ray_crosses_poly() {
         let points = [
@@ -253,5 +390,7 @@ mod tests {
             ray.relate(&poly),
             LinearPolygonRelation::IntersectPlaneInside(Vector3::x())
         );
-    }
+
+    j}
+    */
 }
