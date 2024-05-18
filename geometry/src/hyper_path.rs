@@ -5,6 +5,5 @@ pub mod hyper_point;
 pub mod hyper_surface;
 pub mod length;
 pub mod line;
-pub mod primitive_surface;
-pub mod simple_surface;
+pub mod shifted_hyper_path;
 pub mod split_hyper_line;

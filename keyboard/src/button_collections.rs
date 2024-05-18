@@ -1,80 +1,27 @@
-use geometry::origin::Origin;
+use geometry::{
+    decimal::Dec,
+    geometry::Geometry,
+    hyper_path::{
+        hyper_line::HyperLine,
+        hyper_path::{HyperPath, Root},
+        hyper_point::SuperPoint,
+        hyper_surface::{dynamic_surface::DynamicSurface, simple_dynamic_surface::SimpleSurface},
+    },
+    indexes::geo_index::index::GeoIndex,
+    origin::Origin,
+};
+use itertools::Itertools;
 
 use crate::{
     button::Button, button_collection_builder::ButtonsCollectionBuilder,
-    buttons_column::ButtonsColumn,
+    buttons_column::ButtonsColumn, next_and_peek::NextAndPeekBlank,
 };
 
 #[derive(Debug)]
 #[allow(unused)]
 pub struct ButtonsCollection {
-    //pub origin: Origin,
     pub(crate) columns: Vec<ButtonsColumn>,
-    //first_column_ix: usize,
-    //last_column_ix: usize,
 }
-
-/*
-impl ButtonsHull for ButtonsCollection {
-    fn buttons(&self) -> Box<dyn Iterator<Item = Button> + '_> {
-        Box::new(
-            self.columns
-                .iter()
-                .flat_map(|column| column.buttons())
-                .map(|mut b| {
-                    b.origin.add(&self.origin);
-                    b
-                }),
-        )
-    }
-
-    fn right_buttons(&self) -> Box<dyn Iterator<Item = Button> + '_> {
-        let last_column_ix = self.last_column_ix;
-        if let Some(right_column) = self.columns.get(last_column_ix) {
-            Box::new(right_column.buttons().map(|mut b| {
-                b.origin.add(&self.origin);
-                b
-            }))
-        } else {
-            Box::new(empty())
-        }
-    }
-
-    fn left_buttons(&self) -> Box<dyn Iterator<Item = Button> + '_> {
-        let first_column_ix = self.first_column_ix;
-        if let Some(right_column) = self.columns.get(first_column_ix) {
-            Box::new(right_column.buttons().map(|mut b| {
-                b.origin.add(&self.origin);
-                b
-            }))
-        } else {
-            Box::new(empty())
-        }
-    }
-
-    fn top_buttons(&self) -> Box<dyn Iterator<Item = Button> + '_> {
-        Box::new(self.columns.iter().filter_map(|c| c.top()).map(|mut b| {
-            b.origin.add(&self.origin);
-            b
-        }))
-    }
-
-    fn bottom_buttons(&self) -> Box<dyn Iterator<Item = Button> + '_> {
-        Box::new(self.columns.iter().filter_map(|c| c.bottom()).map(|mut b| {
-            b.origin.add(&self.origin);
-            b
-        }))
-    }
-
-    fn columns(&self) -> impl Iterator<Item = ButtonsColumn> + '_ {
-        self.columns.iter().map(|c| {
-            let mut c = c.to_owned();
-            c.origin.add(&self.origin);
-            c
-        })
-    }
-}
-    */
 
 impl ButtonsCollection {
     pub fn build() -> ButtonsCollectionBuilder {
@@ -87,34 +34,154 @@ impl ButtonsCollection {
         }
     }
 
-    pub(crate) fn buttons(&self) -> impl Iterator<Item = &Button> {
+    pub(crate) fn buttons(&self) -> impl DoubleEndedIterator<Item = &Button> {
         self.columns.iter().flat_map(|col| col.buttons())
     }
-    /*
-    pub fn with_columns(mut self, columns: Vec<ButtonsColumn>) -> Self {
-        self.columns = columns;
-        self.last_column_ix = self.columns.len() - 1;
-        self
-    }
-    pub fn new(origin: Origin) -> Self {
-        Self {
-            origin,
-            columns: Vec::new(),
-            first_column_ix: 0,
-            last_column_ix: 0,
-        }
-    }
+
     pub fn left_column(&self) -> Option<&ButtonsColumn> {
         self.columns.first()
     }
+
     pub fn right_column(&self) -> Option<&ButtonsColumn> {
-        if !self.columns.is_empty() {
-            self.columns.last()
-        } else {
-            None
-        }
+        self.columns.last()
     }
-    */
+
+    pub fn left_line_inner(
+        &self,
+        thickness: Dec,
+    ) -> impl DoubleEndedIterator<Item = SuperPoint<Dec>> + '_ {
+        self.columns
+            .first()
+            .into_iter()
+            .flat_map(move |c| c.left_line_inner(thickness))
+    }
+
+    pub fn right_line_inner(
+        &self,
+        thickness: Dec,
+    ) -> impl DoubleEndedIterator<Item = SuperPoint<Dec>> + '_ {
+        self.columns
+            .last()
+            .into_iter()
+            .flat_map(move |c| c.right_line_inner(thickness))
+    }
+
+    pub fn top_line_inner(
+        &self,
+        thickness: Dec,
+    ) -> impl DoubleEndedIterator<Item = SuperPoint<Dec>> + '_ {
+        self.columns
+            .iter()
+            .flat_map(move |c| c.top_line_inner(thickness))
+    }
+
+    pub fn bottom_line_inner(
+        &self,
+        thickness: Dec,
+    ) -> impl DoubleEndedIterator<Item = SuperPoint<Dec>> + '_ {
+        self.columns
+            .iter()
+            .flat_map(move |c| c.bottom_line_inner(thickness))
+    }
+
+    pub fn left_line_outer(
+        &self,
+        thickness: Dec,
+    ) -> impl DoubleEndedIterator<Item = SuperPoint<Dec>> + '_ {
+        self.columns
+            .first()
+            .into_iter()
+            .flat_map(move |c| c.left_line_outer(thickness))
+    }
+
+    pub fn right_line_outer(
+        &self,
+        thickness: Dec,
+    ) -> impl DoubleEndedIterator<Item = SuperPoint<Dec>> + '_ {
+        self.columns
+            .last()
+            .into_iter()
+            .flat_map(move |c| c.right_line_outer(thickness))
+    }
+
+    pub fn top_line_outer(
+        &self,
+        thickness: Dec,
+    ) -> impl DoubleEndedIterator<Item = SuperPoint<Dec>> + '_ {
+        self.columns
+            .iter()
+            .flat_map(move |c| c.top_line_outer(thickness))
+    }
+
+    pub fn bottom_line_outer(
+        &self,
+        thickness: Dec,
+    ) -> impl DoubleEndedIterator<Item = SuperPoint<Dec>> + '_ {
+        self.columns
+            .iter()
+            .flat_map(move |c| c.bottom_line_outer(thickness))
+    }
+    pub fn right_bottom_corner_inner(
+        &self,
+        thickness: Dec,
+    ) -> impl DoubleEndedIterator<Item = SuperPoint<Dec>> + '_ {
+        self.columns
+            .last()
+            .into_iter()
+            .flat_map(move |c| c.right_bottom_corner_inner(thickness))
+    }
+
+    pub(crate) fn fill_columns(&self, index: &mut GeoIndex, thickness: Dec) -> anyhow::Result<()> {
+        for c in &self.columns {
+            c.filler_inner(index, thickness)?;
+            c.filler_outer(index, thickness)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn fill_between_columns_inner(
+        &self,
+        index: &mut GeoIndex,
+        thickness: Dec,
+    ) -> anyhow::Result<()> {
+        for c in self.columns.iter().next_and_peek(move |p, n| {
+            let right_line = p
+                .right_line_inner(thickness)
+                .next_and_peek(|a, b| HyperLine::new_2(*a, *b))
+                .fold(Root::new(), |hp, l| hp.push_back(l));
+            let left_line = n
+                .left_line_inner(thickness)
+                .rev()
+                .next_and_peek(|a, b| HyperLine::new_2(*a, *b))
+                .fold(Root::new(), |hp, l| hp.push_back(l));
+            DynamicSurface::new(right_line, left_line)
+        }) {
+            c.polygonize(index, 1)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn fill_between_columns_outer(
+        &self,
+        index: &mut GeoIndex,
+        thickness: Dec,
+    ) -> anyhow::Result<()> {
+        for c in self.columns.iter().next_and_peek(move |p, n| {
+            let right_line = p
+                .right_line_outer(thickness)
+                .next_and_peek(|a, b| HyperLine::new_2(*a, *b))
+                .fold(Root::new(), |hp, l| hp.push_back(l));
+            let left_line = n
+                .left_line_outer(thickness)
+                .rev()
+                .next_and_peek(|a, b| HyperLine::new_2(*a, *b))
+                .fold(Root::new(), |hp, l| hp.push_back(l));
+            DynamicSurface::new(left_line, right_line)
+        }) {
+            c.polygonize(index, 1)?;
+        }
+        Ok(())
+    }
 }
 
 /*

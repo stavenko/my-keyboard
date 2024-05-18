@@ -1,15 +1,11 @@
-use std::iter;
-
 use geometry::{decimal::Dec, origin::Origin};
 use itertools::Itertools;
-use nalgebra::{Unit, UnitQuaternion};
 use num_traits::Zero;
 
 use crate::{
     angle::Angle,
     button::{Button, ButtonMountKind},
     buttons_column::ButtonsColumn,
-    next_and_peek::NextAndPeekBlank,
 };
 
 pub struct ButtonRec {
@@ -40,13 +36,13 @@ pub struct ButtonsColumnBuilder {
     addition_column_padding: Dec,
 
     /// Buttons, collected around center
-    main_buttons: Vec<ButtonRec>,
+    main_buttons: Vec<Button>,
 
     /// Buttons, collected around center
-    top_buttons: Vec<ButtonRec>,
+    top_buttons: Vec<Button>,
 
     /// Buttons, collected around center
-    bottom_buttons: Vec<ButtonRec>,
+    bottom_buttons: Vec<Button>,
 }
 
 impl Default for ButtonsColumnBuilder {
@@ -93,36 +89,34 @@ impl ButtonsColumnBuilder {
 
     pub fn add_on_top(
         mut self,
-        kind: ButtonMountKind,
-        additional_padding: Dec,
-        incline: Angle,
-        depth: Dec,
+        button: Button,
+        //kind: ButtonMountKind,
+        //additional_padding: Dec,
+        //incline: Angle,
+        //depth: Dec,
     ) -> Self {
-        self.top_buttons.push(ButtonRec {
-            additional_padding,
-            depth,
-            incline,
-            kind,
-        });
+        self.top_buttons.push(button);
         self
     }
 
     pub fn add_on_bottom(
         mut self,
-        kind: ButtonMountKind,
-        additional_padding: Dec,
-        incline: Angle,
-        depth: Dec,
+        button: Button,
+        //kind: ButtonMountKind,
+        //additional_padding: Dec,
+        //incline: Angle,
+        //depth: Dec,
     ) -> Self {
-        self.bottom_buttons.push(ButtonRec {
-            additional_padding,
-            depth,
-            incline,
-            kind,
-        });
+        self.bottom_buttons.push(button);
         self
     }
 
+    pub fn main_button(mut self, button: Button) -> Self {
+        self.main_buttons.push(button);
+        self
+    }
+
+    /*
     pub fn main_buttons(mut self, buttons: usize, kind: ButtonMountKind) -> Self {
         for _ in 0..buttons {
             self.main_buttons.push(ButtonRec {
@@ -134,6 +128,17 @@ impl ButtonsColumnBuilder {
         }
         self
     }
+    fn calculate_circle(&self) -> Dec {
+        todo!();
+    }
+    fn calculate_bottom_origin(&self) -> Origin {
+        todo!();
+    }
+
+    pub fn button_roots(&self) -> Vec<Origin> {
+        todo!()
+    }
+    */
 
     pub fn build(self) -> ButtonsColumn {
         ButtonsColumn {
@@ -172,7 +177,7 @@ impl ButtonsColumnBuilder {
             let kind = btn.kind;
 
             let x = start_with.x();
-            let tot_move = self.padding + kind.button_height() + btn.additional_padding;
+            let tot_move = self.padding + kind.button_height(); // + btn.additional_padding;
             Some((
                 Origin::new()
                     .offset_y(tot_move / two)
@@ -204,15 +209,21 @@ impl ButtonsColumnBuilder {
         if let Some((mut o, mut prev_kind)) = self.first_btn() {
             let x = o.x();
             let two = Dec::from(2);
-            for b in button_recs {
+            for b in button_recs.iter_mut() {
                 let tot_pad =
                     prev_kind.button_height() / two + b.kind.button_height() / two + self.padding;
+
+                let mut new_b = b.clone();
+                new_b.origin.apply(&o);
+                buttons.push(new_b);
+                /*
                 let btn_o = o.clone().offset_y(b.additional_padding).offset_z(-b.depth);
                 let btn_x = btn_o.x();
                 buttons.push(Button::new(
                     btn_o.rotate_axisangle(btn_x * b.incline.rad()),
                     b.kind,
                 ));
+                */
                 o = o
                     .offset_y(tot_pad / two)
                     .rotate_axisangle(x * (self.curvature.rad()))
@@ -244,15 +255,15 @@ impl ButtonsColumnBuilder {
             let x = o.x();
             let two = Dec::from(2);
             for b in button_recs {
-                let tot_pad = prev_kind.button_height() / two
-                    + b.kind.button_height() / two
-                    + self.padding
-                    + b.additional_padding;
+                let tot_pad =
+                    prev_kind.button_height() / two + b.kind.button_height() / two + self.padding; //+ b.additional_padding;
+
                 let new_o = o
                     .clone()
                     .offset_y(-tot_pad / two)
-                    .rotate_axisangle(x * (-self.curvature.rad() - self.incline.rad()))
+                    .rotate_axisangle(x * (-self.curvature.rad()))
                     .offset_y(-tot_pad / two);
+                /*
                 let btn_o = new_o
                     .clone()
                     .offset_y(b.additional_padding)
@@ -262,6 +273,11 @@ impl ButtonsColumnBuilder {
                     btn_o.rotate_axisangle(btn_x * b.incline.rad()),
                     b.kind,
                 ));
+                */
+                let mut new_b = b.clone();
+                new_b.origin.apply(&new_o);
+
+                buttons.push(new_b);
                 o = new_o;
                 prev_kind = b.kind;
             }

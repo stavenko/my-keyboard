@@ -1,7 +1,12 @@
-use std::{collections::HashSet, fmt};
+use std::{
+    collections::HashSet,
+    fmt::{self, write},
+};
 
-use nalgebra::{Vector2, Vector3};
+use itertools::Itertools;
+use nalgebra::{ComplexField, RealField, Vector2, Vector3};
 use num_traits::Zero;
+use rand::Rng;
 use rstar::{Point, RTreeObject, AABB};
 use stl_io::{Triangle, Vector};
 use tap::TapFallible;
@@ -21,6 +26,19 @@ use super::{
     rib::RibRef,
     seg::{Seg, SegRef},
 };
+
+#[derive(Debug, PartialEq)]
+pub enum Side {
+    Front,
+    Back,
+}
+
+#[derive(Debug)]
+pub struct PolygonSplitMeta {
+    pub by_plane: Plane,
+    pub other: PolyId,
+    pub side: Side,
+}
 
 impl From<Aabb> for AABB<RtreePt> {
     fn from(value: Aabb) -> Self {
@@ -83,29 +101,93 @@ impl<'a> PolyRef<'a> {
                 index: self.index,
             })
     }
+    pub fn svg_debug(&self, vertices: Vec<Vector2<Dec>>) -> String {
+        let mut items = Vec::new();
+        let colors = ["red", "green", "blue", "orange", "purple"];
+        let mut path = Vec::new();
+        for (ix, vv) in vertices.iter().enumerate() {
+            //let vv = basis.project_on_plane_z(v);
+            if ix <= 2 {
+                items.push(format!(
+                    "<circle cx=\"{}\" cy=\"{}\" r=\"0.08\" fill=\"{}\"/> ",
+                    vv.x.round_dp(4),
+                    vv.y.round_dp(4),
+                    colors[ix],
+                ))
+            }
+            if ix == 0 {
+                path.push(format!("M {} {}", vv.x.round_dp(4), vv.y.round_dp(4)));
+            } else {
+                path.push(format!("L {} {}", vv.x.round_dp(4), vv.y.round_dp(4)));
+            }
+        }
+        path.push("z".to_string());
+        let c = colors[rand::thread_rng().gen_range(0..colors.len())];
+        items.push(format!(
+            "<path stroke=\"{}\" stroke-width=\"0.06\" d = \"{}\" />",
+            c,
+            path.join(" ")
+        ));
+        items.join("\n")
+    }
 
     pub(crate) fn triangles(&self) -> anyhow::Result<Vec<Triangle>> {
-        let mut index = Quadtree::default();
-        let basis = self.calculate_polygon_basis();
+        /*
+        if self.get_segments().count() == 3 {
+            let vs = self.index.get_polygon_vertices(self.poly_id);
+            let triangle = Triangle {
+                normal: Vector::new([
+                    self.get_plane().normal().x.into(),
+                    self.get_plane().normal().y.into(),
+                    self.get_plane().normal().x.into(),
+                ]),
+                vertices: vs
+                    .into_iter()
+                    .map(|v| Vector::new([v.x.into(), v.y.into(), v.z.into()]))
+                    .collect_vec()
+                    .try_into()
+                    .expect("ok"),
+            };
 
-        for s in self.segments_2d_iter(&basis) {
-            index.insert(s.from);
-            index.insert(s.to);
+            return Ok(vec![triangle]);
         }
+        */
+        let basis = self.calculate_polygon_basis();
+        let mut index = Vec::new();
+
+        let mut dbg_2d_poly1 = Vec::new();
+        let mut dbg_2d_poly2 = Vec::new();
         let mut contour: Vec<usize> = self
             .segments_2d_iter(&basis)
-            .filter_map(|s| index.get_point_index(&s.from))
+            .map(|s| {
+                index.push(s.from);
+                dbg_2d_poly2.push(s.from);
+                index.len() - 1
+            })
             .collect();
+
+        //let linearized = index.linearize();
+        //if contour.len() == 15 {
+        //dbg!(contour.len());
+        //dbg!(&contour);
+        //dbg!(contour.iter().map(|i| linearized[*i]).collect_vec());
+        //}
 
         if let Some(first) = contour.first() {
             contour.push(*first);
         }
+
+        for p in &contour {
+            let f = index[*p];
+            dbg_2d_poly1.push(f);
+        }
+
         let tup_array: Vec<_> = index
-            .linearize()
             .into_iter()
             .map(|v| (v.x.round_dp(9).into(), v.y.round_dp(9).into()))
             .collect();
 
+        let c_len = contour.len();
         let contours = vec![contour];
         let mut t = cdt::Triangulation::new_from_contours(&tup_array, &contours).tap_err(|e| {
             panic!("{}", e);
@@ -114,6 +196,22 @@ impl<'a> PolyRef<'a> {
             t.step().tap_err(|e| {
                 panic!("{}", e);
             })?;
+        }
+
+        let res: Vec<Vector2<Dec>> = t
+            .triangles()
+            .flat_map(|(a, b, c)| [a, b, c])
+            .map(|a| Vector2::new(tup_array[a].0.into(), tup_array[a].1.into()))
+            .collect();
+
+        if c_len > 14 {
+            dbg!(&basis);
+            println!(
+                "--------------------SVG------------------\n{}\n{}\n{}\n\n~~~~~~~~~~~~~",
+                self.svg_debug(dbg_2d_poly1),
+                self.svg_debug(dbg_2d_poly2),
+                self.svg_debug(res),
+            );
         }
 
         let result = t
@@ -149,8 +247,18 @@ impl<'a> PolyRef<'a> {
         let vertices = self.index.get_polygon_vertices(self.poly_id);
         let sum: Vector3<Dec> = vertices.iter().copied().fold(Vector3::zero(), |a, b| a + b);
         let center = sum / Dec::from(vertices.len());
-        let v = vertices.first().expect("we have point");
-        let plane_x = (v - center).normalize();
+        let v = vertices
+            .into_iter()
+            .max_by(|a, b| {
+                let aa = (a - center).magnitude_squared();
+                let bb = (b - center).magnitude_squared();
+                aa.cmp(&bb)
+            })
+            .expect("Cannot calculate max distance from center");
+
+        let distance = (v - center).magnitude();
+
+        let plane_x = (v - center) / distance;
         let plane_y = plane.normal().cross(&plane_x).normalize();
 
         PolygonBasis {
@@ -195,7 +303,7 @@ impl<'a> PolyRef<'a> {
         self.index.vertices.get_point(v)
     }
 
-    pub(crate) fn get_segments(&self) -> impl Iterator<Item = SegRef<'a>> + '_ {
+    pub fn get_segments(&self) -> impl Iterator<Item = SegRef<'a>> + '_ {
         self.index
             .polygons
             .get(&self.poly_id)
@@ -224,6 +332,13 @@ pub struct PolyRef<'a> {
     pub(super) poly_id: PolyId,
     pub(super) index: &'a GeoIndex,
 }
+
+impl<'a> fmt::Debug for PolyRef<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.index.print_debug_polygon(self.poly_id))
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Poly {
     pub(super) segments: Vec<Seg>,
@@ -250,6 +365,12 @@ impl PartialEq for Poly {
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct PolyId(pub(super) usize);
+
+impl From<usize> for PolyId {
+    fn from(value: usize) -> Self {
+        Self(value)
+    }
+}
 
 impl fmt::Debug for PolyId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

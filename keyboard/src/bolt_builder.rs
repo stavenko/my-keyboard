@@ -196,6 +196,7 @@ impl BoltBuilder {
         }
         diff
     }
+
     pub fn with_nut(&self, scad_object: ScadObject) -> ScadObject {
         let mut union = ScadObject::new(ScadElement::Union);
         union.add_child(scad_object);

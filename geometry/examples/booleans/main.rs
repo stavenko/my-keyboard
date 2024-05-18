@@ -549,6 +549,7 @@ fn smaller_box_cutted_by_bigger(file_root: PathBuf) -> anyhow::Result<Vec<String
     let result = index
         .get_mutable_mesh(box_one)
         .boolean_diff(box_two)
+        .unwrap()
         .remove(0);
 
     let filename = "smaller_cutted_by_bigger.stl";
@@ -598,6 +599,7 @@ fn smaller_box_cutted_by_longer(file_root: PathBuf) -> anyhow::Result<Vec<String
     let result = index
         .get_mutable_mesh(box_one)
         .boolean_diff(box_two)
+        .unwrap()
         .remove(0);
 
     let filename = "smaller_cutted_by_longer.stl";
@@ -645,7 +647,10 @@ fn smaller_box_cutted_by_bigger_in_two(file_root: PathBuf) -> anyhow::Result<Vec
     );
 
     let mut paths = Vec::new();
-    let mut results = index.get_mutable_mesh(box_one).boolean_diff(box_two);
+    let mut results = index
+        .get_mutable_mesh(box_one)
+        .boolean_diff(box_two)
+        .unwrap();
 
     let filename = "cutted_in_two1.stl";
     let r = results.remove(0);

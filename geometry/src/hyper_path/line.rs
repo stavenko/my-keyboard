@@ -13,7 +13,7 @@ pub trait GetT {
     fn get_t(&self, t: Self::Scalar) -> Self::Value;
 }
 
-impl<const O: usize, T> GetT for HyperLine<O, T>
+impl<T> GetT for HyperLine<T>
 where
     T: Tensor + Mul<T::Scalar, Output = T>,
     T::Scalar: From<u16>,
@@ -23,17 +23,18 @@ where
 
     fn get_t(&self, t: Self::Scalar) -> Self::Value
 where {
-        let ws = (0..O).map(|i| bernstein::<O, _>(i, t));
-        let v: Vec<T> = ws.zip(self.0).map(|(w, t)| t * w).collect_vec();
+        let o = self.0.len();
+        let ws = (0..o).map(|i| bernstein::<_>(i, o, t));
+        let v: Vec<T> = ws.zip(&self.0).map(|(w, t)| *t * w).collect_vec();
         v.into_iter().fold(T::zero(), |a, t| a + t)
     }
 }
 
-pub(crate) fn bernstein<const O: usize, F>(item: usize, t: F) -> F
+pub(crate) fn bernstein<F>(item: usize, of: usize, t: F) -> F
 where
     F: One + Sub<F, Output = F> + Pow<u16, Output = F> + From<u16> + Copy + fmt::Debug,
 {
-    let opt = O - 1;
+    let opt = of - 1;
     let factor = (fact(opt) / (fact(item) * fact(opt - item))) as u16;
     let ot = F::one() - t;
     let o_item = opt - item;
@@ -60,11 +61,11 @@ mod tests {
     #[test]
     fn bernstein() {
         let t = Dec::zero();
-        let ws = (0..4).map(|i| super::bernstein::<4, _>(i, t)).collect_vec();
+        let ws = (0..4).map(|i| super::bernstein::<_>(i, 4, t)).collect_vec();
         assert_eq!(ws, vec![Dec::one(), Dec::zero(), Dec::zero(), Dec::zero(),]);
 
         let t = Dec::one();
-        let ws = (0..4).map(|i| super::bernstein::<4, _>(i, t)).collect_vec();
+        let ws = (0..4).map(|i| super::bernstein::<_>(i, 4, t)).collect_vec();
         assert_eq!(ws, vec![Dec::zero(), Dec::zero(), Dec::zero(), Dec::one(),]);
     }
 }

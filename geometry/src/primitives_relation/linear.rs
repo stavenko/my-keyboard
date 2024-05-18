@@ -43,8 +43,9 @@ pub enum LinearIntersection {
 
 #[derive(PartialEq, Debug)]
 pub enum LinearRefIntersection {
-    In(Vector3<Dec>),
-    Origin(PtId),
+    In(Dec, Dec),
+    One,
+    Zero,
 }
 
 impl Relation<Line> for Line {
@@ -181,11 +182,11 @@ impl<'a> Relation<SegRef<'a>> for Line {
                 if y.is_negative() || y > Dec::one() {
                     LinearRefRelation::Independent
                 } else if y.is_zero() {
-                    LinearRefRelation::Intersect(LinearRefIntersection::Origin(to.from_pt()))
+                    LinearRefRelation::Intersect(LinearRefIntersection::Zero)
                 } else if y.is_one() {
-                    LinearRefRelation::Intersect(LinearRefIntersection::Origin(to.to_pt()))
+                    LinearRefRelation::Intersect(LinearRefIntersection::One)
                 } else {
-                    LinearRefRelation::Intersect(LinearRefIntersection::In(p1))
+                    LinearRefRelation::Intersect(LinearRefIntersection::In(st.x, st.y))
                 }
             } else {
                 LinearRefRelation::Crossed { this: p1, to: p2 }
@@ -328,7 +329,7 @@ impl<'a> Relation<SegRef<'a>> for Ray {
 
         let dot = self.dir.dot(&segment_dir).round_dp(STABILITY_ROUNDING - 1);
 
-        let m = Matrix2::new(Dec::from(1), -dot, dot, -Dec::from(1));
+        let m = Matrix2::new(Dec::one(), -dot, dot, -Dec::one());
         let b = -Vector2::new(q.dot(&self.dir), q.dot(&segment_dir));
 
         if let Some(mi) = m.try_inverse() {
@@ -346,11 +347,11 @@ impl<'a> Relation<SegRef<'a>> for Ray {
                 if y.is_negative() || y > Dec::one() || st.x.is_negative() {
                     LinearRefRelation::Independent
                 } else if y.is_zero() {
-                    LinearRefRelation::Intersect(LinearRefIntersection::Origin(to.from_pt()))
+                    LinearRefRelation::Intersect(LinearRefIntersection::Zero)
                 } else if y.is_one() {
-                    LinearRefRelation::Intersect(LinearRefIntersection::Origin(to.to_pt()))
+                    LinearRefRelation::Intersect(LinearRefIntersection::One)
                 } else {
-                    LinearRefRelation::Intersect(LinearRefIntersection::In(p1))
+                    LinearRefRelation::Intersect(LinearRefIntersection::In(st.x, y))
                 }
             } else {
                 LinearRefRelation::Crossed { this: p1, to: p2 }

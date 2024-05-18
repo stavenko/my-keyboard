@@ -1,4 +1,4 @@
-use std::{collections::HashSet, ops::Deref};
+use std::{collections::HashSet, iter, ops::Deref};
 
 use itertools::Itertools;
 use nalgebra::Vector3;
@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use crate::{
     decimal::Dec,
+    indexes::geo_index::poly::Side,
     measure_time::print_time,
     primitives_relation::{point_volume::PointVolumeRelation, relation::Relation},
 };
@@ -205,31 +206,79 @@ impl<'a> MeshRefMut<'a> {
         meshes
     }
 
-    pub fn boolean_diff(self, tool: MeshId) -> Vec<MeshRef<'a>> {
+    pub fn boolean_diff(self, tool: MeshId) -> Result<Vec<MeshRef<'a>>, (PolyId, PolyId)> {
         // insert tool polygons in index
         //let tool_mesh_id = self.geo_index.save_mesh(tool.sides());
 
+        let mut ps_cutted = HashSet::new();
         while let Some((poly, tool)) = self.geo_index.find_first_intersection(&tool) {
+            // dbg!("aaa");
             let plane = self.geo_index.calculate_polygon_plane(tool);
-            self.geo_index.split_poly_by_plane(poly, &plane);
+            ps_cutted.insert(poly);
+            match self.geo_index.split_poly_by_plane(poly, &plane) {
+                Ok(ps) => ps_cutted.extend(ps),
+                Err(_) => {
+                    return Err((poly, tool));
+                }
+            };
         }
 
         while let Some((poly, tool)) = self.geo_index.find_first_intersection(&self.mesh_id) {
             let plane = self.geo_index.calculate_polygon_plane(tool);
-            self.geo_index.split_poly_by_plane(poly, &plane);
+
+            match self.geo_index.split_poly_by_plane(poly, &plane) {
+                Ok(ps) => ps_cutted.extend(ps),
+                Err(_) => {
+                    return Err((poly, tool));
+                }
+            };
+        }
+        dbg!("@");
+
+        let ps1 = self
+            .geo_index
+            .mark_based_on_cutted_polygons(self.mesh_id, tool, Side::Front);
+
+        let ps = self
+            .geo_index
+            .mark_based_on_cutted_polygons(tool, self.mesh_id, Side::Back);
+
+        let lll = dbg!(ps_cutted.len());
+        //self.geo_index.drop_polygons(ps1.into_iter().chain(ps));
+        let around_ribs = ps1.into_iter().chain(ps).collect::<HashSet<_>>();
+        dbg!(&around_ribs);
+        let ccc = ps_cutted
+            .difference(&around_ribs)
+            .filter(|p| self.geo_index.polygons.contains_key(p))
+            .collect_vec();
+        let lll = ccc.len();
+
+        dbg!(lll);
+        for p in ccc.iter() {
+            for r in self.geo_index.get_polygon_ribs(p) {
+                if self.geo_index.rib_to_poly[&r].len() == 3 {
+                    panic!("WTF!");
+                }
+            }
+
+            self.geo_index.flip_polygon(**p);
+            println!("{:?}", p);
         }
 
+        //self.geo_index.drop_polygons(ps.into_iter());
+        /*
         let to_drop_inside_tool = self.geo_index.find_insides(self.mesh_id, tool);
         let to_drop_outside_self = self.geo_index.find_outsides(tool, self.mesh_id);
 
         self.geo_index
             .drop_polygons(to_drop_outside_self.into_iter().chain(to_drop_inside_tool));
 
+        */
         self.geo_index.remove_opposites_and_collapse_sames();
 
         self.geo_index.inverse_mesh(tool);
 
         //self.geo_index.join_mesh_bounds_in_same_plane();
-        self.geo_index.collect_meshes()
+        Ok(self.geo_index.collect_meshes())
     }
 }

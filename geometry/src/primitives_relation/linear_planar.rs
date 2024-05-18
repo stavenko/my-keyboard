@@ -171,12 +171,20 @@ impl<'a> Relation<PolyRef<'a>> for Ray {
                             }
                             common_ribs.push(segment.rib());
                         }
-                        LinearRefRelation::Intersect(LinearRefIntersection::Origin(pt_id)) => {
+                        LinearRefRelation::Intersect(LinearRefIntersection::One) => {
+                            let pt_id = segment.to_pt();
                             if !common_ribs.iter().any(|rib| rib.has(pt_id)) {
                                 vertices.push(pt_id);
                             }
                         }
-                        LinearRefRelation::Intersect(LinearRefIntersection::In(v)) => {
+                        LinearRefRelation::Intersect(LinearRefIntersection::Zero) => {
+                            let pt_id = segment.from_pt();
+                            if !common_ribs.iter().any(|rib| rib.has(pt_id)) {
+                                vertices.push(pt_id);
+                            }
+                        }
+                        LinearRefRelation::Intersect(LinearRefIntersection::In(v, _)) => {
+                            let v = self.origin + self.dir * v;
                             ribs.push((segment.rib(), v))
                         }
                         _ => {}
@@ -337,14 +345,24 @@ impl<'a> Relation<PolyRef<'a>> for Line {
                             }
                             common_ribs.push(segment.rib());
                         }
-                        LinearRefRelation::Intersect(LinearRefIntersection::Origin(v)) => {
+                        LinearRefRelation::Intersect(LinearRefIntersection::Zero) => {
+                            let v = segment.from_pt();
                             if !common_ribs.iter().any(|s| s.has(v))
                                 && !vertices.iter().any(|&x| x == v)
                             {
                                 vertices.push(v);
                             }
                         }
-                        LinearRefRelation::Intersect(LinearRefIntersection::In(v)) => {
+                        LinearRefRelation::Intersect(LinearRefIntersection::One) => {
+                            let v = segment.to_pt();
+                            if !common_ribs.iter().any(|s| s.has(v))
+                                && !vertices.iter().any(|&x| x == v)
+                            {
+                                vertices.push(v);
+                            }
+                        }
+                        LinearRefRelation::Intersect(LinearRefIntersection::In(v, _)) => {
+                            let v = self.origin + self.dir * v;
                             ribs.push((*segment.rib(), v))
                         }
                         _ => {

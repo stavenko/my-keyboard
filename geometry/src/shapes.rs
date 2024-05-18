@@ -87,7 +87,7 @@ pub fn cylinder(b: Basis, h: Dec, r: Dec, s: usize) -> Vec<Polygon> {
             + bottom_basis.x() * ap.cos() * r
             + bottom_basis.y() * ap.sin() * r;
 
-        wall.push(Polygon::new(vec![apt, ant, anb, apb]).unwrap());
+        wall.push(Polygon::new(vec![apb, anb, ant, apt]).unwrap());
         top.push(apt);
         bottom.push(bottom_point);
     }

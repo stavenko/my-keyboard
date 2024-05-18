@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fmt::{self, Debug},
+};
 
 use nalgebra::Vector3;
 use uuid::Uuid;
@@ -34,21 +37,26 @@ pub struct Seg {
     pub(super) dir: SegmentDir,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct SegRef<'i> {
     pub(super) rib_id: RibId,
     pub(super) dir: SegmentDir,
     pub(super) index: &'i GeoIndex,
 }
+impl<'a> fmt::Debug for SegRef<'a> {
+    fn fmt(&self, fo: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let f = self.from();
+        let t = self.to();
+        write!(fo, "{} {} {} -> {} {} {}", f.x, f.y, f.z, t.x, t.y, t.z)
+    }
+}
 
 impl<'a> SegRef<'a> {
-    pub(crate) fn from(&self) -> Vector3<Dec> {
-        let rib = self.index.ribs[&self.rib_id];
+    pub fn from(&self) -> Vector3<Dec> {
         self.index.vertices.get_point(self.from_pt())
     }
 
-    pub(crate) fn to(&self) -> Vector3<Dec> {
-        let rib = self.index.ribs[&self.rib_id];
+    pub fn to(&self) -> Vector3<Dec> {
         self.index.vertices.get_point(self.to_pt())
     }
 
@@ -67,6 +75,7 @@ impl<'a> SegRef<'a> {
             SegmentDir::Rev => rib.0,
         }
     }
+
     pub(crate) fn from_pt(&self) -> PtId {
         let rib = self.index.ribs[&self.rib_id];
         match self.dir {
@@ -77,7 +86,7 @@ impl<'a> SegRef<'a> {
 
     pub(crate) fn rib(&self) -> super::rib::RibRef<'a> {
         RibRef {
-            index: &self.index,
+            index: self.index,
             rib_id: self.rib_id,
         }
     }

@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use nalgebra::Vector3;
 use num_traits::{Signed, Zero};
+use rust_decimal_macros::dec;
 
 use crate::{
     decimal::{Dec, NORMAL_DOT_ROUNDING, STABILITY_ROUNDING},
@@ -277,11 +278,16 @@ impl<'a> Relation<Vector3<Dec>> for PolyRef<'a> {
                     }
 
                     match ray.relate(&segment) {
-                        LinearRefRelation::Intersect(LinearRefIntersection::Origin(v)) => {
-                            vertices.push(v);
+                        LinearRefRelation::Intersect(LinearRefIntersection::Zero) => {
+                            vertices.push(segment.from_pt());
                         }
-                        LinearRefRelation::Intersect(LinearRefIntersection::In(_)) => {
-                            //dbg!("in");
+                        LinearRefRelation::Intersect(LinearRefIntersection::One) => {
+                            vertices.push(segment.to_pt());
+                        }
+                        LinearRefRelation::Intersect(LinearRefIntersection::In(ray, seg)) => {
+                            if seg < Dec::from(dec!(0.01)) || seg > Dec::from(dec!(0.99)) {
+                                println!("But most importantly: here {ray}, {seg} ");
+                            }
                             edges_crossed += 1;
                         }
                         _ => {}
@@ -297,6 +303,7 @@ impl<'a> Relation<Vector3<Dec>> for PolyRef<'a> {
                             .filter(|rib_vertex| *rib_vertex != v)
                             .collect::<Vec<PtId>>(),
                     ) {
+                        dbg!("WE HIT HERE ");
                         let root = self.get_vertex(v);
                         let rib1 = self.get_vertex(rib1);
                         let rib2 = self.get_vertex(rib2);
@@ -311,7 +318,6 @@ impl<'a> Relation<Vector3<Dec>> for PolyRef<'a> {
                             rib1.normalize(),
                             rib2.normalize(),
                         ) {
-                            //dbg!("v");
                             edges_crossed += 1;
                         }
                     }

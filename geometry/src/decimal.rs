@@ -6,7 +6,7 @@ use std::{
 };
 
 use approx::{AbsDiffEq, UlpsEq};
-use nalgebra::{ComplexField, Field, RealField, SimdValue, Vector3};
+use nalgebra::{ComplexField, Field, RealField, SimdValue};
 use num_traits::{pow::Pow, Bounded, FromPrimitive, Num, Signed, ToPrimitive};
 use rust_decimal::{
     prelude::{One, Zero},
@@ -28,6 +28,16 @@ pub const EPS: Dec = Dec(dec!(1e-8));
 pub const STABILITY_ROUNDING: u32 = 14;
 pub const NORMAL_DOT_ROUNDING: u32 = 4;
 //pub const STABILITY_ROUNDING_F: u32 = 15;
+
+pub trait Round {
+    fn round(self, order: u32) -> Self;
+}
+
+impl Round for Dec {
+    fn round(self, order: u32) -> Self {
+        self.round_dp(order)
+    }
+}
 
 impl SubsetOf<Dec> for Dec {
     fn to_superset(&self) -> Dec {
@@ -72,14 +82,6 @@ impl Pow<i64> for Dec {
 
     fn pow(self, rhs: i64) -> Self::Output {
         Dec(self.0.powi(rhs))
-    }
-}
-
-impl Mul<Vector3<Dec>> for Dec {
-    type Output = Vector3<Dec>;
-
-    fn mul(self, rhs: Vector3<Dec>) -> Self::Output {
-        self * rhs
     }
 }
 

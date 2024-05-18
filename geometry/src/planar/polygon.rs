@@ -307,7 +307,18 @@ impl Polygon {
         let a = v - u;
         let b = w - u;
 
+        if a.magnitude_squared().is_zero() || b.magnitude_squared().is_zero() {
+            return Err(anyhow::anyhow!(
+                "Cannot calculate plane of polygon, we got repeated points"
+            ));
+        }
         let cross = &a.cross(&b);
+        //dbg!(cross.magnitude());
+        if cross.magnitude().is_zero() {
+            return Err(anyhow::anyhow!(
+                "Cannot calculate plane of polygon, cross product have zero length"
+            ));
+        }
         let mut plane = Plane::new_from_normal_and_point(cross.normalize(), u);
         let x = a.normalize();
         let y = b.normalize();

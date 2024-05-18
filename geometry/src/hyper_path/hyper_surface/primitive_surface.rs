@@ -2,9 +2,7 @@ use std::ops::Div;
 
 use nalgebra::Vector3;
 
-use crate::{geometry::Geometry, parametric_iterator::ParametricIterator};
-
-use super::line::GetT;
+use crate::{geometry::Geometry, hyper_path::line::GetT, parametric_iterator::ParametricIterator};
 
 pub struct PrimitiveSurface<A, B>(pub(super) A, pub(super) B)
 where

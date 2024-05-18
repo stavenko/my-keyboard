@@ -9,10 +9,18 @@ pub struct ParametricIterator<F> {
 }
 
 impl<F> ParametricIterator<F> {
-    pub(crate) fn new(segments: usize) -> Self {
+    pub fn new(segments: usize) -> Self {
         Self {
             segments,
             current_segment: 0,
+            _tp: Default::default(),
+        }
+    }
+
+    pub fn new_with_start(segments: usize, start: usize) -> Self {
+        Self {
+            segments,
+            current_segment: start,
             _tp: Default::default(),
         }
     }

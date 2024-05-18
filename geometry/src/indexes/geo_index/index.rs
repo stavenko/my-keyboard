@@ -1,6 +1,10 @@
 use crate::indexes::geo_index::poly::PolyRef;
+use crate::indexes::geo_index::seg::SegRef;
 use crate::indexes::polygon_oriented_bb::PolygonOrientedBb;
+use crate::linear::line::Line;
+use crate::primitives_relation::linear::{LinearRefIntersection, LinearRefRelation};
 use crate::primitives_relation::linear_planar::LinearPolygonRefRelation;
+use crate::primitives_relation::linear_point::PointOnLine;
 use crate::{indexes::aabb::Aabb, primitives_relation::point_planar::PointPolygonRefRelation};
 use std::{
     borrow::Cow,
@@ -9,6 +13,7 @@ use std::{
     hash::Hash,
 };
 
+use anyhow::anyhow;
 use itertools::Itertools;
 use nalgebra::Vector3;
 use num_traits::{One, Signed, Zero};
@@ -29,6 +34,7 @@ use crate::{
     reversable::Reversable,
 };
 
+use super::poly::{PolygonSplitMeta, Side};
 use super::rib::RibRef;
 use super::tri_iter::TriIter;
 use super::{
@@ -40,8 +46,9 @@ use super::{
 
 #[derive(Debug, Default)]
 pub struct GeoIndex {
-    pub(super) vertices: VertexIndex,
+    pub(crate) vertices: VertexIndex,
     pub(super) polygon_index: RTree<PolyRtreeRecord>,
+    pub(super) polygon_meta: HashMap<PolyId, PolygonSplitMeta>,
     pub(super) ribs: HashMap<RibId, Rib>,
     pub(super) polygons: HashMap<PolyId, Poly>,
     // pub(super) mesh_bounds: HashMap<MeshBoundId, MeshBound>,
@@ -77,9 +84,11 @@ impl GeoIndex {
         self.mesh_counter += 1;
         MeshId(self.mesh_counter)
     }
+
     pub(crate) fn find_insides(&self, of_mesh: MeshId, by_mesh: MeshId) -> Vec<PolyId> {
-        let marked =
-            self.mark_foreign_polygons(of_mesh, by_mesh, |r, p, m| self.is_polygon_inside(r, p, m));
+        let marked = self.mark_foreign_polygons_generic(of_mesh, by_mesh, |r, p, m| {
+            self.is_polygon_inside(r, p, m)
+        });
 
         marked
             .into_iter()
@@ -88,9 +97,11 @@ impl GeoIndex {
             .map(|kv| kv.0)
             .collect()
     }
+
     pub(crate) fn find_outsides(&self, of_mesh: MeshId, by_mesh: MeshId) -> Vec<PolyId> {
-        let marked = self
-            .mark_foreign_polygons(of_mesh, by_mesh, |r, p, m| self.is_polygon_outside(r, p, m));
+        let marked = self.mark_foreign_polygons_generic(of_mesh, by_mesh, |r, p, m| {
+            self.is_polygon_outside(r, p, m)
+        });
 
         marked
             .into_iter()
@@ -100,7 +111,39 @@ impl GeoIndex {
             .collect()
     }
 
-    fn mark_foreign_polygons<T: Clone + Debug + Into<bool>>(
+    pub(crate) fn mark_based_on_cutted_polygons(
+        &self,
+        of_mesh: MeshId,
+        by_mesh: MeshId,
+        take_side: Side,
+    ) -> HashSet<PolyId> {
+        let checkpoint = std::time::Instant::now();
+        let mut result = HashSet::new();
+        let common_ribs = self
+            .ribs
+            .keys()
+            .filter(|rib_id| self.rib_to_poly.get(rib_id).is_some_and(|ps| ps.len() == 4))
+            .collect::<HashSet<_>>();
+        let checkpoint = print_time("   mark_foreign_polygons: find common ribs", checkpoint);
+
+        println!("    >found common ribs {}", common_ribs.len());
+        for r in common_ribs {
+            for p in &self.rib_to_poly[&r] {
+                if self
+                    .get_mesh_for_polygon(*p)
+                    .is_some_and(|mesh_id| mesh_id == by_mesh)
+                {
+                    //let meta = &self.polygon_meta[&p];
+                    //if meta.side == take_side {
+                    result.insert(*p);
+                    //}
+                }
+            }
+        }
+
+        result
+    }
+    fn mark_foreign_polygons_generic<T: Clone + Debug + Into<bool>>(
         &self,
         of_mesh: MeshId,
         by_mesh: MeshId,
@@ -117,13 +160,10 @@ impl GeoIndex {
 
         println!("    >found common ribs {}", common_ribs.len());
         for r in common_ribs {
-            self.rib_to_poly[&r].len();
+            // self.rib_to_poly[&r].len();
             for p in &self.rib_to_poly[&r] {
                 if !result.contains_key(p) {
                     let v = marker(r, *p, by_mesh);
-                    if v.clone().into() {
-                        panic!("WWWWW {v:?}");
-                    }
 
                     result.insert(*p, v);
                 }
@@ -192,36 +232,78 @@ impl GeoIndex {
 
         let poly = self.load_polygon_ref(poly_id);
         let plane = poly.get_plane();
+
+        // Some vector in polygon plane, we achieved it by crossing certain rib dir and
+        // plane normal this vector is perpendicular to rib dir.
         let in_poly = dir.cross(&plane.normal()).normalize();
+        let line = Line {
+            origin: center,
+            dir: in_poly,
+        };
+
+        let pr = self.load_polygon_ref(poly_id);
+        let (negative_intersections, positive_intersections) = pr
+            .get_segments()
+            .filter(|s| s.rib_id != rib_id)
+            .filter_map(|s| match line.relate(&s) {
+                LinearRefRelation::Intersect(LinearRefIntersection::In(pt, _)) => Some(pt),
+                _ => None,
+            })
+            .partition::<Vec<_>, _>(|f| *f < Dec::zero());
+
+        let pt = if positive_intersections.len() % 2 == 1 {
+            let min = positive_intersections.iter().min().expect("at least one");
+            let point_on_rib = line.origin + line.dir * *min;
+            line.origin.lerp(&point_on_rib, Dec::from(dec!(0.5)))
+        } else if negative_intersections.len() % 2 == 1 {
+            let max = negative_intersections.iter().max().expect("at least one");
+            let point_on_rib = line.origin + line.dir * *max;
+            line.origin.lerp(&point_on_rib, Dec::from(dec!(0.5)))
+        } else {
+            panic!("no intersections");
+        };
+
+        if !matches!(poly.relate(&pt), PointPolygonRefRelation::In) {
+            dbg!(negative_intersections);
+            dbg!(positive_intersections);
+            dbg!(pt);
+            dbg!(poly);
+            panic!("we found point, that is incorrectly outside our polygon(negs)");
+        }
+
+        // now we collecting all points of polygon, which are not on the rib line and
+        // partition then in relation to rib in direction of `in_poly`.
+        /*
         let (negs, poses) = self
             .get_polygon_vertices(poly_id)
             .into_iter()
             .map(|v| in_poly.dot(&(v - center)).round_dp(STABILITY_ROUNDING))
             .filter(|p| !p.is_zero())
             .partition::<Vec<_>, _>(|d| *d < Dec::zero());
-        if negs.is_empty() {
-            let closest = poses.into_iter().min().expect("non_empty") / Dec::from(100);
-            //panic!("CHECK poses {closest}");
-            let pt = center + in_poly * closest;
-            assert!(matches!(poly.relate(&pt), PointPolygonRefRelation::In));
-            pt
-        } else {
-            let closest = negs.into_iter().max().expect("non_empty") / Dec::from(100);
-            //panic!("CHECK negs {closest}");
-            let pt = center + in_poly * closest;
-            assert!(matches!(poly.relate(&pt), PointPolygonRefRelation::In));
-            pt
-        }
 
-        /*
-            panic!("CHECK poses");
-        let in_poly_pt = center - in_poly * d;
-        if matches!(poly.relate(&in_poly_pt), PointPolygonRelation::In) {
-            in_poly_pt
+        if negs.is_empty() {
+            let closest = *poses.iter().min().expect("non_empty") / Dec::from(1000);
+            let pt = center + in_poly * closest;
+            if !matches!(poly.relate(&pt), PointPolygonRefRelation::In) {
+                println!("{}", closest);
+                dbg!(poses);
+                dbg!(pt);
+                dbg!(poly);
+                panic!("we found point, that is incorrectly outside our polygon (poses)");
+            }
+            pt
         } else {
-            center + in_poly * d
-        }
+            let closest = *negs.iter().max().expect("non_empty") / Dec::from(1000);
+            let pt = center + in_poly * closest;
+            if !matches!(poly.relate(&pt), PointPolygonRefRelation::In) {
+                println!("{}", closest);
+                dbg!(negs);
+                dbg!(pt);
+                dbg!(poly);
+                panic!("we found point, that is incorrectly outside our polygon(negs)");
+            }
         */
+        pt
     }
 
     pub(crate) fn inverse_poly(&mut self, poly_id: PolyId) {
@@ -296,13 +378,16 @@ impl GeoIndex {
         mesh_id
     }
 
-    pub(crate) fn split_poly_by_plane(&mut self, poly_id: PolyId, plane: &Plane) {
+    pub(crate) fn split_poly_by_plane(
+        &mut self,
+        poly_id: PolyId,
+        plane: &Plane,
+    ) -> anyhow::Result<[PolyId; 2]> {
         let poly = &self.polygons[&poly_id];
         let original_polygon_plane = poly.plane.clone();
         let mut fronts = Vec::new();
         let mut backs = Vec::new();
         let mut plane_intersects = Vec::new();
-        let mut starting = None;
         let mut split_ribs = Vec::new();
         let mut ff = HashMap::new();
         let mut bb = HashMap::new();
@@ -339,10 +424,7 @@ impl GeoIndex {
                     ff.insert(fronts.len() - 1, "WO");
                     bb.insert(backs.len() - 1, "WO");
 
-                    if starting.is_none() {
-                        starting = Some(Starting::AfterFront);
-                    }
-                    //println!(" WO");
+                    // println!(" WO");
                     //println!("u {} {} {}", u.x, u.y, u.z);
                     //println!("f {} {} {}", pt_from.x, pt_from.y, pt_from.z);
                     //println!("t {} {} {}", pt_to.x, pt_to.y, pt_to.z);
@@ -369,9 +451,6 @@ impl GeoIndex {
                     fronts.push(Segment { from: u, to: pt_to });
                     ff.insert(fronts.len() - 1, "OW");
                     bb.insert(backs.len() - 1, "OW");
-                    if starting.is_none() {
-                        starting = Some(Starting::AfterBack);
-                    }
 
                     //println!(" OW");
                     //println!("u {} {} {}", u.x, u.y, u.z);
@@ -403,9 +482,6 @@ impl GeoIndex {
                 }
                 (PointPlanarRelation::OpposeToNormal, PointPlanarRelation::In) => {
                     //println!(" OI");
-                    if starting.is_none() {
-                        starting = Some(Starting::AfterBack);
-                    }
                     if !plane_intersects.contains(&to) {
                         plane_intersects.push(to);
                     }
@@ -419,9 +495,6 @@ impl GeoIndex {
                 }
                 (PointPlanarRelation::WithNormal, PointPlanarRelation::In) => {
                     //println!(" WI");
-                    if starting.is_none() {
-                        starting = Some(Starting::AfterFront);
-                    }
                     if !plane_intersects.contains(&to) {
                         plane_intersects.push(to);
                     }
@@ -435,9 +508,6 @@ impl GeoIndex {
                 }
                 (PointPlanarRelation::In, PointPlanarRelation::OpposeToNormal) => {
                     //println!(" IO");
-                    if starting.is_none() {
-                        starting = Some(Starting::BeforeBack);
-                    }
 
                     if !plane_intersects.contains(&from) {
                         plane_intersects.push(from);
@@ -454,9 +524,6 @@ impl GeoIndex {
                 }
                 (PointPlanarRelation::In, PointPlanarRelation::WithNormal) => {
                     //println!(" IW");
-                    if starting.is_none() {
-                        starting = Some(Starting::BeforeFront);
-                    }
                     if !plane_intersects.contains(&from) {
                         plane_intersects.push(from);
                     }
@@ -465,13 +532,9 @@ impl GeoIndex {
                         to: pt_to,
                     });
                     ff.insert(fronts.len() - 1, "IW");
-                    //dbg!(&fronts);
-                    //dbg!(&backs);
-                    // segments are circular, we already putted this point, or will put this point
-                    // later
                 }
-                (PointPlanarRelation::In, _) => {
-                    //println!(" I > {:?}", x);
+                (PointPlanarRelation::In, _x) => {
+                    //println!(" I > {:?}", _x);
                     fronts.push(Segment {
                         from: pt_from,
                         to: pt_to,
@@ -486,18 +549,16 @@ impl GeoIndex {
             }
         }
 
-        //dbg!(&plane_intersects);
-        let mut plane_intersects = plane_intersects
-            .into_iter()
-            .map(|v| self.vertices.get_point(v))
-            .collect_vec();
-        // lets check, of first segment inside polygon
         if plane_intersects.len() > 1 {
-            let pt = plane_intersects.first().and_then(|f| {
-                plane_intersects
-                    .get(1)
-                    .map(|t| f.lerp(t, Dec::one() / Dec::from(2)))
-            });
+            let pt = plane_intersects
+                .first()
+                .map(|p| self.vertices.get_point(*p))
+                .and_then(|f| {
+                    plane_intersects
+                        .get(1)
+                        .map(|p| self.vertices.get_point(*p))
+                        .map(|t| f.lerp(&t, Dec::one() / Dec::from(2)))
+                });
 
             if pt
                 .map(|p| self.load_polygon_ref(poly_id).relate(&p))
@@ -505,31 +566,20 @@ impl GeoIndex {
             {
                 plane_intersects.rotate_left(1);
             }
-            // Now we create segments and ribs in plane
-            for chunk in &plane_intersects.clone().into_iter().chunks(2) {
-                let maybe_chunk: Result<[Vector3<Dec>; 2], _> =
-                    chunk.collect::<Vec<Vector3<Dec>>>().try_into();
-
-                if let Ok([from, to]) = maybe_chunk {
-                    let (back, front) = if starting.as_ref().is_some_and(|t| {
-                        matches!(t, Starting::AfterFront) || matches!(t, Starting::BeforeBack)
-                    }) {
-                        (Segment { from, to }, Segment { from: to, to: from })
-                    } else {
-                        (Segment { from: to, to: from }, Segment { from, to })
-                    };
-                    //dbg!("===OK===");
-                    //dbg!(&fronts);
-                    //dbg!(&backs);
-                    fronts.push(front);
-                    backs.push(back);
-                    ff.insert(fronts.len() - 1, "INSIDE");
-                    bb.insert(backs.len() - 1, "INSIDE");
-                }
-            }
-        } else {
-            panic!("WTF");
         }
+
+        let new_ribs: Vec<RibId> = plane_intersects
+            .chunks(2)
+            .filter_map(|c| <&[PtId] as TryInto<[PtId; 2]>>::try_into(c).ok())
+            .map(|[pt1, pt2]| {
+                if pt1 < pt2 {
+                    self.insert_rib(Rib(pt1, pt2)).0
+                } else {
+                    self.insert_rib(Rib(pt2, pt1)).0
+                }
+            })
+            .collect();
+        // Now we create segments and ribs in plane
 
         for (point, rib_id) in &split_ribs {
             for poly_id in self.rib_to_poly.remove(rib_id).into_iter().flatten() {
@@ -542,7 +592,7 @@ impl GeoIndex {
             .into_iter()
             .map(|front| self.save_segment(front.clone()))
             .collect_vec();
-        let front_segments = self.arrange_segments(front_segments);
+        let front_segments = self.arrange_segments(front_segments, new_ribs.clone())?;
 
         let front_points = front_segments
             .iter()
@@ -557,7 +607,7 @@ impl GeoIndex {
             .into_iter()
             .map(|front| self.save_segment(front.clone()))
             .collect_vec();
-        let back_segments = self.arrange_segments(back_segments);
+        let back_segments = self.arrange_segments(back_segments, new_ribs)?;
         let back_points = back_segments
             .iter()
             .map(|s| s.rib_id)
@@ -583,6 +633,24 @@ impl GeoIndex {
 
         let front_polygon_id = self.insert_poly(front_polygon);
         let back_polygon_id = self.insert_poly(back_polygon);
+
+        self.set_cutted_polygon_meta(
+            front_polygon_id,
+            PolygonSplitMeta {
+                by_plane: plane.clone(),
+                other: back_polygon_id,
+                side: super::poly::Side::Front,
+            },
+        );
+
+        self.set_cutted_polygon_meta(
+            back_polygon_id,
+            PolygonSplitMeta {
+                by_plane: plane.clone(),
+                other: front_polygon_id,
+                side: super::poly::Side::Back,
+            },
+        );
         for s in &front_segments {
             Self::save_index(&mut self.rib_to_poly, s.rib_id, front_polygon_id);
         }
@@ -590,28 +658,84 @@ impl GeoIndex {
             Self::save_index(&mut self.rib_to_poly, s.rib_id, back_polygon_id);
         }
 
-        self.replace_polygons(poly_id, &[front_polygon_id, back_polygon_id]);
+        self.replace_polygons_in_meshes(poly_id, &[front_polygon_id, back_polygon_id]);
 
         self.remove_polygon(poly_id);
+
+        Ok([front_polygon_id, back_polygon_id])
     }
 
-    fn arrange_segments(&self, mut segments: Vec<Seg>) -> Vec<Seg> {
+    fn arrange_segments(
+        &self,
+        mut segments: Vec<Seg>,
+        mut new_ribs: Vec<RibId>,
+    ) -> anyhow::Result<Vec<Seg>> {
         let mut result = Vec::new();
         let mut last = segments.swap_remove(0);
         result.push(last);
 
-        while let Some(s) = segments
-            .iter()
-            .position(|s| s.from(&self.ribs) == last.to(&self.ribs))
-        {
-            last = segments.swap_remove(s);
-            result.push(last);
-        }
-        if !segments.is_empty() {
-            panic!("Not all segments taken");
+        loop {
+            if let Some(s) = segments
+                .iter()
+                .position(|s| s.from(&self.ribs) == last.to(&self.ribs))
+            {
+                last = segments.swap_remove(s);
+                result.push(last);
+            } else if let Some(ix) = new_ribs.iter().position(|rib_id| {
+                let rib = self.ribs[rib_id];
+                rib.0 == last.to(&self.ribs) || rib.1 == last.to(&self.ribs)
+            }) {
+                let rib_id = new_ribs.swap_remove(ix);
+
+                let rib = self.ribs[&rib_id];
+                last = if rib.0 == last.to(&self.ribs) {
+                    Seg {
+                        rib_id,
+                        dir: SegmentDir::Fow,
+                    }
+                } else {
+                    Seg {
+                        rib_id,
+                        dir: SegmentDir::Rev,
+                    }
+                };
+                result.push(last);
+            } else {
+                break;
+            }
         }
 
-        result
+        if !segments.is_empty() {
+            for s in &segments {
+                println!("left {:?} -> {:?}", s.from(&self.ribs), s.to(&self.ribs));
+            }
+            for s in result {
+                println!(
+                    "collected {:?} -> {:?}",
+                    s.from(&self.ribs),
+                    s.to(&self.ribs)
+                );
+            }
+            return Err(anyhow::anyhow!("Not all segments taken {}", segments.len()));
+        } else if result.last().is_some_and(|last| {
+            result.first().is_some_and(|first| {
+                //dbg!(first.from(&self.ribs));
+                //dbg!(last.to(&self.ribs));
+                first.from(&self.ribs) != last.to(&self.ribs)
+            })
+        }) {
+            for s in result {
+                println!("{:?} -> {:?}", s.from(&self.ribs), s.to(&self.ribs));
+            }
+            return Err(anyhow!("segment loop is not finished"));
+        }
+
+        Ok(result)
+    }
+
+    fn split_rib_in_poly_using_indexed_pt(&mut self, pt: PtId, rib_id: RibId, poly_id: PolyId) {
+        let v = self.vertices.get_point(pt);
+        self.split_rib_in_poly(v, rib_id, poly_id)
     }
 
     fn split_rib_in_poly(&mut self, pt: Vector3<Dec>, rib_id: RibId, poly_id: PolyId) {
@@ -635,11 +759,12 @@ impl GeoIndex {
             .map(|s| self.save_segment(s));
 
             for r in replacement {
-                //println!("save index: {:?}", r.rib_id);
                 Self::save_index(&mut self.rib_to_poly, r.rib_id, poly_id);
             }
             if let Some(poly) = self.polygons.get_mut(&poly_id) {
+                //dbg!(&poly.segments);
                 poly.segments.splice(ix..(ix + 1), replacement);
+                //dbg!(&poly.segments);
             }
         } else {
             panic!("NO RIB");
@@ -734,13 +859,26 @@ impl GeoIndex {
     }
     */
 
+    pub fn save_as_polygon<S>(&mut self, polygon_vertices: &[Vector3<S>]) -> anyhow::Result<PolyId>
+    where
+        S: Into<Dec> + nalgebra::Scalar + nalgebra::Field + Copy,
+    {
+        let vx = polygon_vertices
+            .into_iter()
+            .map(|s| Vector3::new(s.x.into(), s.y.into(), s.z.into()))
+            .collect_vec();
+        let polygon = Polygon::new(vx)?;
+
+        Ok(self.save_polygon(&polygon))
+    }
+
     pub fn save_polygon(&mut self, polygon: &Polygon) -> PolyId {
         let aabb = Aabb::from_points(&polygon.vertices);
 
         let segments = polygon
             .get_segments()
             .into_iter()
-            .map(|s| self.save_segment(s))
+            .flat_map(|s| self.save_segment_splittin_ribs(s))
             .collect_vec();
         let plane = polygon.get_plane();
 
@@ -751,6 +889,113 @@ impl GeoIndex {
         };
 
         self.insert_poly(poly)
+    }
+
+    pub fn save_segment_splittin_ribs(&mut self, segment: Segment) -> Vec<Seg> {
+        let from = self.insert_point(segment.from);
+        let to = self.insert_point(segment.to);
+
+        let mut found_for_from = false;
+
+        if let Some(ribs) = self.pt_to_ribs.get(&from).cloned() {
+            for r in &ribs {
+                let rr = self.get_rib(*r);
+                match rr.relate(&to) {
+                    PointOnLine::On => {
+                        found_for_from = true;
+                        for ps_for_rib in self.rib_to_poly.remove(r).into_iter().flatten() {
+                            println!("cut {r:?} in {ps_for_rib:?}");
+
+                            self.split_rib_in_poly_using_indexed_pt(to, *r, ps_for_rib);
+                            Self::remove_item_from_index(&mut self.pt_to_ribs, &to, r);
+                            Self::remove_item_from_index(&mut self.pt_to_ribs, &from, r);
+                        }
+                    }
+                    PointOnLine::Outside => {}
+                    PointOnLine::Origin => {}
+                }
+
+                let rr = self.get_rib(*r);
+                for (pt, v) in
+                    [rr.from_pt(), rr.to_pt()].map(|pt| (pt, self.vertices.get_point(pt)))
+                {
+                    match segment.relate(&v) {
+                        PointOnLine::On => {
+                            if pt != from && pt != to {
+                                let mut segs = vec![Seg {
+                                    rib_id: *r,
+                                    dir: if rr.from_pt() == from {
+                                        SegmentDir::Fow
+                                    } else {
+                                        SegmentDir::Rev
+                                    },
+                                }];
+                                segs.extend(self.save_segment_splittin_ribs(Segment {
+                                    from: v,
+                                    to: segment.to,
+                                }));
+
+                                return segs;
+                            }
+                        }
+                        PointOnLine::Outside => {}
+                        PointOnLine::Origin => {}
+                    }
+                }
+            }
+        }
+
+        if let Some(ribs) = self.pt_to_ribs.get(&to).cloned() {
+            for r in &ribs {
+                let rr = self.get_rib(*r);
+
+                match rr.relate(&from) {
+                    PointOnLine::On => {
+                        if found_for_from {
+                            dbg!("Found point on for `to`, after finding for `from`");
+                        }
+                        for ps_for_rib in self.rib_to_poly.remove(r).into_iter().flatten() {
+                            println!("cut {r:?} in {ps_for_rib:?}");
+                            self.split_rib_in_poly_using_indexed_pt(from, *r, ps_for_rib);
+                            Self::remove_item_from_index(&mut self.pt_to_ribs, &to, r);
+                            Self::remove_item_from_index(&mut self.pt_to_ribs, &from, r);
+                        }
+                    }
+                    PointOnLine::Outside => {}
+                    PointOnLine::Origin => {}
+                }
+
+                let rr = self.get_rib(*r);
+                for (pt, v) in
+                    [rr.from_pt(), rr.to_pt()].map(|pt| (pt, self.vertices.get_point(pt)))
+                {
+                    match segment.relate(&v) {
+                        PointOnLine::On => {
+                            if pt != from && pt != to {
+                                let mut segs = vec![Seg {
+                                    rib_id: *r,
+                                    dir: if rr.from_pt() == from {
+                                        SegmentDir::Fow
+                                    } else {
+                                        SegmentDir::Rev
+                                    },
+                                }];
+                                segs.extend(self.save_segment_splittin_ribs(Segment {
+                                    to: v,
+                                    from: segment.from,
+                                }));
+
+                                return segs;
+                            }
+                        }
+                        PointOnLine::Outside => {}
+                        PointOnLine::Origin => {}
+                    }
+                }
+            }
+        }
+
+        vec![self.save_segment(segment)]
     }
 
     pub fn save_segment(&mut self, segment: Segment) -> Seg {
@@ -767,7 +1012,8 @@ impl GeoIndex {
         } else {
             Rib(from, to)
         };
-        let rib_id = self.insert_rib(rib);
+
+        let (rib_id, _) = self.insert_rib(rib);
         Self::save_index(&mut self.pt_to_ribs, from, rib_id);
         Self::save_index(&mut self.pt_to_ribs, to, rib_id);
 
@@ -911,7 +1157,7 @@ impl GeoIndex {
         */
     }
 
-    pub(crate) fn load_polygon_ref(&self, other_id: PolyId) -> PolyRef<'_> {
+    pub fn load_polygon_ref(&self, other_id: PolyId) -> PolyRef<'_> {
         PolyRef {
             poly_id: other_id,
             index: self,
@@ -936,15 +1182,19 @@ impl GeoIndex {
         Polygon::new(vertices).expect("must be ok")
     }
 
-    fn insert_rib(&mut self, rib: Rib) -> RibId {
+    pub(super) fn insert_rib(&mut self, rib: Rib) -> (RibId, bool) {
         if let Some(rib_id) = self.ribs.iter().find(|(_, &s)| s == rib).map(|(id, _)| id) {
-            *rib_id
+            (*rib_id, false)
         } else {
             let rib_id = self.get_next_rib_id();
             //println!("@NEW RIB  {rib_id:?} ");
             self.ribs.insert(rib_id, rib);
-            rib_id
+            (rib_id, true)
         }
+    }
+
+    fn set_cutted_polygon_meta(&mut self, poly_id: PolyId, meta: PolygonSplitMeta) {
+        self.polygon_meta.insert(poly_id, meta);
     }
 
     fn insert_poly(&mut self, poly: Poly) -> PolyId {
@@ -972,6 +1222,7 @@ impl GeoIndex {
             self.polygon_bounding_boxes
                 .insert(poly_id, polygon_bounding_box);
 
+            // self.polygon_source.insert(poly_id, PolygonSource::Outside);
             poly_id
         }
     }
@@ -1157,9 +1408,8 @@ impl GeoIndex {
         }
     }
 
-    pub(crate) fn collect_meshes(&mut self) -> Vec<MeshRef<'_>> {
+    pub fn collect_meshes(&mut self) -> Vec<MeshRef<'_>> {
         let checkpoint = std::time::Instant::now();
-        // self.update_mesh_bounds_index();
         self.meshes.clear();
         let checkpoint = print_time("  update index and clean", checkpoint);
 
@@ -1401,27 +1651,25 @@ impl GeoIndex {
         ribs.intersection(&self.get_polygon_ribs(poly_id)).count() > 0
     }
 
-    fn replace_polygons(&mut self, poly_id: PolyId, polygons: &[PolyId]) {
+    fn replace_polygons_in_meshes(&mut self, poly_id: PolyId, polygons: &[PolyId]) {
         // println!("POLYGONS TO REPLACE {}", polygons.len());
-        let mesh_id = self
-            .get_mesh_for_polygon(poly_id)
-            .expect("Cannot find mesh for splitted polygon");
+        if let Some(mesh_id) = self.get_mesh_for_polygon(poly_id) {
+            let polygon_index = self
+                .meshes
+                .get(&mesh_id)
+                .into_iter()
+                .flat_map(|mesh| &mesh.0)
+                .position(|p| *p == poly_id)
+                .expect("We cannot find polygon position in newfound mesh");
 
-        let polygon_index = self
-            .meshes
-            .get(&mesh_id)
-            .into_iter()
-            .flat_map(|mesh| &mesh.0)
-            .position(|p| *p == poly_id)
-            .expect("We cannot find polygon position in newfound mesh");
-
-        for (i, new_polygon_id) in polygons.iter().enumerate() {
-            if i == 0 {
-                if let Some(mesh) = self.meshes.get_mut(&mesh_id) {
-                    mesh.0[polygon_index] = *new_polygon_id;
+            for (i, new_polygon_id) in polygons.iter().enumerate() {
+                if i == 0 {
+                    if let Some(mesh) = self.meshes.get_mut(&mesh_id) {
+                        mesh.0[polygon_index] = *new_polygon_id;
+                    }
+                } else if let Some(m) = self.meshes.get_mut(&mesh_id) {
+                    m.0.push(*new_polygon_id);
                 }
-            } else if let Some(m) = self.meshes.get_mut(&mesh_id) {
-                m.0.push(*new_polygon_id);
             }
         }
     }
@@ -1499,31 +1747,25 @@ impl GeoIndex {
         }
     }
 
-    pub fn find_orphan_ribs(&self) {
-        for (rib_id, ps) in self.rib_to_poly.iter() {
-            if ps.len() < 2 {
-                println!(
-                    " ## ORPHAN {rib_id:?} {} [{:?}]",
-                    ps.len(),
-                    self.polygons[&ps[0]]
-                        .segments
-                        .iter()
-                        .map(|s| s.rib_id)
-                        .collect_vec()
-                );
-            }
-            if ps.len() > 2 {
-                println!(
-                    " ## EXCESS {rib_id:?} {} [{:?}]",
-                    ps.len(),
-                    self.polygons[&ps[0]]
-                        .segments
-                        .iter()
-                        .map(|s| s.rib_id)
-                        .collect_vec()
-                );
-            }
-        }
+    pub fn find_orphan_ribs(&self) -> HashSet<RibId> {
+        self.rib_to_poly
+            .iter()
+            .filter(|(_, r)| r.len() < 2)
+            .filter(|(id, r)| {
+                self.polygons[&r[0]]
+                    .segments
+                    .iter()
+                    .filter(|s| s.rib_id == **id)
+                    .count()
+                    == 1
+            })
+            .inspect(|(id, r)| {
+                if r.is_empty() {
+                    println!("{:?}", id);
+                }
+            })
+            .map(|(id, _)| *id)
+            .collect()
     }
 
     fn is_polygon_intersection_segments_overlap(&self, poly_id: PolyId, tool_id: PolyId) -> bool {
@@ -1706,18 +1948,34 @@ impl GeoIndex {
                     println!("no ribs, no bound, no mesh");
                     return None;
                 }
+                let mut opposite_segment_ribs_count = 0;
+                for r in &ribs {
+                    if self.rib_to_poly[&r].len() == 1
+                        && self.polygons[&polygon_id]
+                            .segments
+                            .iter()
+                            .filter(|s| s.rib_id == *r)
+                            .count()
+                            == 2
+                    {
+                        opposite_segment_ribs_count += 1;
+                    }
+                }
                 for rib_id in &ribs {
                     self.rib_to_poly
                         .get(rib_id)
                         .cloned()
                         .into_iter()
                         .flatten()
-                        .filter(|&mb| mb != polygon_id)
-                        .for_each(|mb| {
-                            if !mesh_index.get(&polygon_id).is_some_and(|v| v.contains(&mb)) {
+                        .filter(|&poly_id| poly_id != polygon_id)
+                        .for_each(|poly_id: PolyId| {
+                            if !mesh_index
+                                .get(&polygon_id)
+                                .is_some_and(|v| v.contains(&poly_id))
+                            {
                                 //self.move_mesh_bound_to_mesh(&mb, mesh_id);
-                                polygon_queue.push_back(mb);
-                                Self::save_index(&mut mesh_index, polygon_id, mb);
+                                polygon_queue.push_back(poly_id);
+                                Self::save_index(&mut mesh_index, polygon_id, poly_id);
                             }
                         });
                 }
@@ -1725,13 +1983,44 @@ impl GeoIndex {
                 if mesh_index
                     .get(&polygon_id)
                     .map(|v| v.iter().map(ToOwned::to_owned).collect::<HashSet<_>>())
-                    .is_some_and(|v| v.len() != ribs.len())
+                    .is_some_and(|v| v.len() != (ribs.len() - opposite_segment_ribs_count))
                 {
+                    for r in &ribs {
+                        println!(">> {r:?} \n {:?}", &self.rib_to_poly[&r]);
+                    }
                     println!(
-                        "Not all mesh bound ribs have correcponding mesh bounds!? \n{:#?}\n{:#?}",
+                        "For {polygon_id:?} Not all polygon ribs have polygons !? \n{:#?}\n{:#?}",
                         mesh_index[&polygon_id].len(),
                         ribs.len()
                     );
+                    let _ = self
+                        .polygon_index
+                        .locate_in_envelope_intersecting(&self.polygons[&polygon_id].aabb.into())
+                        .inspect(|b| {
+                            let p_id = b.0;
+                            println!("Poly: {:?}", p_id);
+                            for seg in self.polygons[&p_id].segments.iter() {
+                                let pt0 = seg.from(&self.ribs);
+                                let pt1 = seg.to(&self.ribs);
+                                let v0 = self.vertices.get_point(pt0);
+                                let v1 = self.vertices.get_point(pt1);
+                                println!(
+                                    "  ribs [{} {} {}] [{} {} {}]   {:?} {:?} : {:?}",
+                                    v0.x.round_dp(8),
+                                    v0.y.round_dp(8),
+                                    v0.z.round_dp(8),
+                                    v1.x.round_dp(8),
+                                    v1.y.round_dp(8),
+                                    v1.z.round_dp(8),
+                                    seg.rib_id,
+                                    pt0,
+                                    pt1
+                                )
+                            }
+                        })
+                        .collect_vec();
+
+                    //println!("{:?}", ps);
                     return None;
                 }
             }
@@ -1886,6 +2175,49 @@ impl GeoIndex {
             rib_id: r,
         }
     }
+
+    pub fn find_polygons_with_orphans(&self) -> Vec<PolyRef<'_>> {
+        self.find_orphan_ribs()
+            .into_iter()
+            .map(|r| {
+                let p = self.rib_to_poly[&r][0];
+                PolyRef {
+                    index: self,
+                    poly_id: p,
+                }
+            })
+            .collect()
+    }
+
+    pub fn flip_polygon(&mut self, poly_id: PolyId) {
+        for p in self.polygons.get_mut(&poly_id).into_iter() {
+            for s in p.segments.iter_mut() {
+                *s = s.flip();
+            }
+            p.plane = p.plane.clone().flip();
+        }
+    }
+
+    pub fn flip_polygons_with_orphans(&mut self) {
+        for r in self.find_orphan_ribs().into_iter() {
+            let p = self.rib_to_poly[&r][0];
+            self.flip_polygon(p);
+        }
+    }
+    pub(crate) fn print_debug_polygon(&self, poly_id: PolyId) -> String {
+        let pr = PolyRef {
+            poly_id,
+            index: self,
+        };
+
+        pr.segments_iter()
+            .map(|s| {
+                let f = s.from();
+                let t = s.to();
+                format!("{} {} {} -> {} {} {}", f.x, f.y, f.z, t.x, t.y, t.z)
+            })
+            .join("\n")
+    }
 }
 
 fn collapse<T: PartialEq>(mut items: Vec<(T, T)>) -> Vec<(T, T)> {
@@ -1905,6 +2237,7 @@ fn collapse<T: PartialEq>(mut items: Vec<(T, T)>) -> Vec<(T, T)> {
     res
 }
 
+#[derive(Debug)]
 enum Starting {
     AfterFront,
     AfterBack,
@@ -1926,5 +2259,47 @@ impl IntoIterator for GeoIndex {
             inner: triangles.into_iter(),
             size,
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use nalgebra::Vector3;
+    use rust_decimal_macros::dec;
+
+    use crate::decimal::Dec;
+
+    use super::GeoIndex;
+
+    #[test]
+    fn real_world_problem() {
+        let mut index = GeoIndex::default();
+
+        #[rustfmt::skip]
+        let p1: &[Vector3<Dec>] = &[
+        Vector3::new(dec!(20.6180339887).into(), dec!(12.4559581815).into(), dec!(3.8817317944).into()),
+        Vector3::new(dec!(20.6180339887).into(), dec!(12.4560890688).into(), dec!(3.8826800212).into()),
+        Vector3::new(dec!(20.6180339887).into(), dec!(12.9097762979).into(), dec!(7.1694655225).into()),
+        Vector3::new(dec!(21.6180339887).into(), dec!(12.1900579255).into(), dec!(7.2688109267).into()),
+        Vector3::new(dec!(21.6180339887).into(), dec!(11.7365480016).into(), dec!(3.9833099320).into()),
+        Vector3::new(dec!(20.9079214406).into(), dec!(12.2474101976).into(), dec!(3.9111780219).into()),
+        Vector3::new(dec!(20.7607867695).into(), dec!(12.3532603778).into(), dec!(3.8962323560).into()),
+
+        ];
+
+        #[rustfmt::skip]
+        let p2: &[Vector3<Dec>] = &[
+        Vector3::new(dec!(18.6975304844).into(), dec!(14.1709823847).into(), dec!(3.5093506678).into() ),
+        Vector3::new(dec!(18.8115659456).into(), dec!(13.7573368844).into(), dec!(3.7111817178).into() ),
+        Vector3::new(dec!(20.6180339887).into(), dec!(12.4560890688).into(), dec!(3.8826800212).into() ),
+        Vector3::new(dec!(20.7607867695).into(), dec!(12.3532603778).into(), dec!(3.8962323560).into() ),
+        ];
+
+        let p1 = index.save_as_polygon(p1).unwrap();
+        let p2 = index.save_as_polygon(p2).unwrap();
+
+        let pl = index.calculate_polygon_plane(p2);
+        let cutted = index.is_polygon_cutted_by(p1, p2);
+        dbg!(cutted);
+        index.split_poly_by_plane(p1, &pl).unwrap();
     }
 }

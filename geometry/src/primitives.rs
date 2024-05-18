@@ -60,7 +60,7 @@ impl Face {
         let cross = &a.cross(&b);
 
         if cross.magnitude() == Dec::zero() {
-            panic!("aaa {u} x {v} x {w}");
+            panic!("aaa {u} x {v} x {w} [{a}: {b}]");
         }
         let normal = cross.normalize();
         Self { vertices, normal }

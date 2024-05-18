@@ -4,7 +4,7 @@ use nalgebra::Vector3;
 
 use crate::{decimal::Dec, indexes::vertex_index::PtId};
 
-use super::index::GeoIndex;
+use super::{index::GeoIndex, seg::SegmentDir};
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Ord, PartialOrd)]
 pub struct RibId(pub(super) usize);
@@ -12,8 +12,18 @@ pub struct RibId(pub(super) usize);
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Rib(pub(super) PtId, pub(super) PtId);
 
+impl Rib {
+    pub fn build(from: PtId, to: PtId) -> (Self, SegmentDir) {
+        if from > to {
+            (Rib(to, from), SegmentDir::Rev)
+        } else {
+            (Rib(from, to), SegmentDir::Fow)
+        }
+    }
+}
+
 pub struct RibRef<'a> {
-    pub(super) index: &'a GeoIndex,
+    pub(crate) index: &'a GeoIndex,
     pub(super) rib_id: RibId,
 }
 

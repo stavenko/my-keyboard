@@ -1,234 +1,152 @@
 use std::{
-    cell::RefCell,
-    ops::{Add, Div},
-    rc::Rc,
+    collections::VecDeque,
+    ops::{Mul, Sub},
 };
 
-use nalgebra::Scalar;
-use num_traits::Zero;
+use num_traits::{One, Zero};
 
-use super::{length::Length, split_hyper_line::SplitHyperLine};
+use super::{hyper_line::HyperLine, hyper_point::Tensor, length::Length};
 
-pub struct HyperPath<F, O, Scalar> {
-    lengths: Rc<RefCell<Vec<Scalar>>>,
-    first: F,
-    other: Option<O>,
-    len: usize,
+pub trait IsLinear {
+    fn is_linear(&self) -> bool;
 }
 
-/*
-pub fn zip_one<A, D, T, F>(a: A, d: D, with: impl )
-where
-    A: HeadTail,
-    D: HeadTail,
-    F:Fn(B, E) -> T) -> (T, Option<(C, F)>
-{
-    let (b, c) = a.head_tail();
-    let (e, f) = d.head_tail();
-    let tail = c.and_then(|c| f.map(|f| (c, f)));
-    let head = with(b, e);
-    (head, tail)
-}
-*/
-
-pub trait HeadTail {
-    type Head;
-    type Tail;
-
-    fn head_tail(self) -> (Self::Head, Option<Self::Tail>);
+#[derive(Clone)]
+pub struct Root<Tensor> {
+    items: VecDeque<HyperLine<Tensor>>,
 }
 
-pub trait Zip {
-    fn zip<T, A, B>(self, with: impl Fn(A, B) -> T) -> Vec<T>;
-}
-
-impl<A, Scalar> HyperPath<A, (), Scalar>
-where
-    A: Length<Scalar = Scalar>,
-{
-    pub fn new(item: A) -> Self {
-        let length = item.length();
+impl<T> Default for Root<T> {
+    fn default() -> Self {
         Self {
-            lengths: Rc::new(RefCell::new(vec![length])),
-            first: item,
-            other: None,
-            len: 1,
+            items: Default::default(),
         }
     }
 }
 
-impl<H, T, Scalar> HeadTail for HyperPath<H, T, Scalar> {
-    fn head_tail(self) -> (H, Option<T>) {
-        (self.first, self.other)
-    }
-
-    type Head = H;
-
-    type Tail = T;
-}
-
-impl HeadTail for () {
-    fn head_tail(self) -> (Self::Head, Option<Self::Tail>) {
-        unreachable!("Head tail fo$ ()")
-    }
-
-    type Head = ();
-
-    type Tail = ();
-}
-
-impl<A, B, Scalar> HyperPath<A, B, Scalar> {
-    pub fn len(&self) -> usize {
-        self.len
+impl<Tensor> Root<Tensor> {
+    pub fn new() -> Self {
+        Self {
+            items: VecDeque::new(),
+        }
     }
 }
 
-impl<A, B, Scalar> HyperPath<A, B, Scalar>
-where
-    Scalar: Div<Scalar, Output = Scalar> + Add<Scalar, Output = Scalar> + Zero + Copy,
-{
-    pub fn push<D>(self, item: D) -> HyperPath<D, Self, Scalar>
+#[allow(clippy::len_without_is_empty)]
+pub trait HyperPath<T>: Sized + Length {
+    fn push_back(self, h: HyperLine<T>) -> Self;
+
+    fn connect_ends(&mut self);
+
+    fn connect_ends_circular(&mut self);
+
+    fn extend(self, h: impl IntoIterator<Item = HyperLine<T>>) -> Self;
+
+    fn map<F, R>(self, map: F) -> Root<R>
     where
-        D: Length<Scalar = Scalar>,
+        F: Fn(HyperLine<T>) -> HyperLine<R>;
+
+    fn push_front(self, h: HyperLine<T>) -> Self;
+
+    fn head_tail(self) -> (HyperLine<T>, Self);
+
+    fn len(&self) -> usize;
+}
+
+impl<T> Length for Root<T>
+where
+    T: Tensor,
+    T: Length<Scalar = <T as Tensor>::Scalar>,
+    <T as Length>::Scalar:
+        Zero + From<u16> + nalgebra::Scalar + nalgebra::ComplexField + nalgebra::RealField,
+    T: Mul<T, Output = T> + Mul<<T as Tensor>::Scalar, Output = T> + Sub<T, Output = T>,
+{
+    type Scalar = <T as Tensor>::Scalar;
+
+    fn length(&self) -> Self::Scalar {
+        self.items
+            .iter()
+            .map(|i| i.length())
+            .fold(Self::Scalar::zero(), |a, f| a + f)
+    }
+}
+
+impl<T> HyperPath<T> for Root<T>
+where
+    T: Tensor,
+    T: Length<Scalar = <T as Tensor>::Scalar>,
+    <T as Length>::Scalar:
+        Zero + One + From<u16> + nalgebra::Scalar + nalgebra::ComplexField + nalgebra::RealField,
+    T: Mul<T, Output = T> + Mul<<T as Tensor>::Scalar, Output = T> + Sub<T, Output = T>,
+{
+    fn push_back(mut self, h: HyperLine<T>) -> Self {
+        self.items.push_back(h);
+        self
+    }
+
+    fn map<F, R>(self, map: F) -> Root<R>
+    where
+        F: Fn(HyperLine<T>) -> HyperLine<R>,
     {
-        let length = item.length();
-
-        let lengths = self.lengths.clone();
-        {
-            let mut lengths_ref = lengths.borrow_mut();
-            lengths_ref.push(length);
-        }
-        HyperPath {
-            lengths,
-            first: item,
-            len: self.len + 1,
-            other: Some(self),
+        Root {
+            items: self.items.into_iter().map(map).collect(),
         }
     }
 
-    /*
-    pub fn length(&self) -> Scalar {
-        let ls = self.lengths.borrow();
-        ls.iter().fold(Scalar::zero(), |acc, l| acc + *l)
+    fn extend(mut self, h: impl IntoIterator<Item = HyperLine<T>>) -> Self {
+        self.items.extend(h);
+        self
     }
 
-    pub fn length_params(&self) -> Vec<Scalar> {
-        let l = self.length();
-        let ls = self.lengths.borrow();
-        ls.iter().map(|ol| *ol / l).collect()
+    fn push_front(mut self, h: HyperLine<T>) -> Self {
+        self.items.push_front(h);
+        self
     }
-    */
 
-    pub fn head(&self) -> &A {
-        &self.first
+    fn head_tail(mut self) -> (HyperLine<T>, Self) {
+        let head = self.items.pop_front().expect("Unreachable");
+        (head, self)
     }
-}
 
-impl<A, B, C, Scalar> HyperPath<A, HyperPath<B, C, Scalar>, Scalar> {
-    pub fn tail(self) -> Option<HyperPath<B, C, Scalar>> {
-        self.other
+    fn len(&self) -> usize {
+        self.items.len()
     }
-}
 
-impl<A, B, C, Scalar> HyperPath<A, HyperPath<B, C, Scalar>, Scalar>
-where
-    A: SplitHyperLine<Scalar>,
-    A: Length<Scalar = Scalar>,
-{
-    pub fn split(
-        mut self,
-        t: Scalar,
-    ) -> HyperPath<A, HyperPath<A, HyperPath<B, C, Scalar>, Scalar>, Scalar> {
-        let (aa, ab) = self.first.split_hyper_line(t);
-        self.first = ab;
-        let lengths = self.lengths.clone();
-        {
-            let mut lengths_ref = lengths.borrow_mut();
-            *lengths_ref.last_mut().expect("Must be at least non-zero") = self.first.length();
-            lengths_ref.push(aa.length());
-        }
-        let len = self.len + 1;
-        HyperPath {
-            lengths,
-            first: aa,
-            other: Some(self),
-            len,
+    fn connect_ends(&mut self) {
+        let l = self.items.len() - 1;
+        let half = <T as Tensor>::Scalar::one() / <T as Tensor>::Scalar::from(2);
+        for cur in 0..l {
+            let next = cur + 1;
+            let f = *(&mut self.items[cur]).0.last().expect("ok");
+            let l = *(&mut self.items[next]).0.first().expect("ok");
+            let d = l - f;
+            let d = d * half;
+            let m = d + f;
+            if let Some(last) = (&mut self.items[cur]).0.last_mut() {
+                *last = m;
+            }
+            if let Some(first) = (&mut self.items[next]).0.first_mut() {
+                *first = m;
+            }
         }
     }
-}
 
-impl<A, B, Scalar> Length for HyperPath<A, B, Scalar>
-where
-    A: Length,
-    B: Length<Scalar = A::Scalar>,
-    A::Scalar: Add<Output = A::Scalar>,
-    A::Scalar: Zero,
-{
-    type Scalar = A::Scalar;
-    fn length(&self) -> Self::Scalar {
-        self.first.length()
-            + self
-                .other
-                .as_ref()
-                .map(|b| b.length())
-                .unwrap_or(Zero::zero())
+    fn connect_ends_circular(&mut self) {
+        let l = self.items.len();
+        let half = <T as Tensor>::Scalar::one() / <T as Tensor>::Scalar::from(2);
+        for cur in 0..l {
+            let next = (cur + 1) % l;
+            let f = *(&mut self.items[cur]).0.last().expect("ok");
+            let l = *(&mut self.items[next]).0.first().expect("ok");
+            let d = l - f;
+            let d = d * half;
+            let m = d + f;
+            if let Some(last) = (&mut self.items[cur]).0.last_mut() {
+                *last = m;
+            }
+            if let Some(first) = (&mut self.items[next]).0.first_mut() {
+                *first = m;
+            }
+        }
     }
-}
-
-impl<A, Scalar> Length for HyperPath<A, (), Scalar>
-where
-    A: Length,
-{
-    type Scalar = A::Scalar;
-
-    fn length(&self) -> Self::Scalar {
-        self.first.length()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use nalgebra::{Vector1, Vector2, Vector3};
-
-    use crate::{decimal::Dec, hyper_path::hyper_line::HyperLine};
-
-    use super::{HeadTail, HyperPath};
-
-    #[test]
-    fn test_norm_length() {
-        let a: Vector3<Dec> = Vector3::new(1.into(), 1.into(), 1.into());
-
-        let norm = a.norm();
-        let length = a.magnitude();
-        assert_eq!(norm, length);
-    }
-    /*
-
-    #[test]
-    fn simple_builder() {
-        let l1 = HyperLine::new_2(Vector1::new(Dec::from(2)), Vector1::new(Dec::from(3)));
-
-        let hp = HyperPath::new(l1);
-        let l2 = HyperLine::new_4(
-            Vector2::new(Dec::from(2f32), 1.0.into()),
-            Vector2::new(3.0.into(), 1.0.into()),
-            Vector2::new(9.0.into(), 1.0.into()),
-            Vector2::new(100.0.into(), 1.0.into()),
-        );
-        let hp2 = hp.push(l2.clone());
-        let l3 = HyperLine::new_2(
-            Vector3::new(0.0f64.into(), 0.0.into(), 0.5.into()),
-            Vector3::new(0.0f64.into(), 1.0.into(), 0.5.into()),
-        );
-        let hp3 = hp2.push(l3.clone());
-
-        let (f2, hp) = hp3.head_tail();
-        assert_eq!(f2, l3);
-
-        let (i4, hp) = hp.unwrap().head_tail();
-        assert_eq!(i4, l2);
-
-        //let (i2, hp) = hp.unwrap().head_tail();
-    }
-    */
 }

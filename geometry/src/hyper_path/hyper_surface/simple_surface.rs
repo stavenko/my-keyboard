@@ -2,14 +2,17 @@ use std::ops::{Add, Div};
 
 use nalgebra::Vector3;
 
-use crate::{geometry::Geometry, parametric_iterator::ParametricIterator};
-
-use super::{
-    hyper_line::HyperLine,
-    hyper_point::{Point, SideDir},
-    line::GetT,
-    primitive_surface::PrimitiveSurface,
+use crate::{
+    geometry::Geometry,
+    hyper_path::{
+        hyper_line::HyperLine,
+        hyper_point::{Point, SideDir},
+        line::GetT,
+    },
+    parametric_iterator::ParametricIterator,
 };
+
+use super::primitive_surface::PrimitiveSurface;
 
 pub trait GetLineAt {
     type Line;

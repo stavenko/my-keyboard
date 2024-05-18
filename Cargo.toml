@@ -1,8 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-  "geometry"
-, "keyboard", 
-  "smol"]
+  "geometry" ,
+  "keyboard", 
+  "smol", 
+  "stand", 
+  "ergoton"]
 
 

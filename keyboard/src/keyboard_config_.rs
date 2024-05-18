@@ -42,6 +42,7 @@ pub struct KeyboardConfig {
     wall_thickness: Dec,
     wall_extension: Dec,
     transition_curvature: EdgeCoefficients,
+    bolts: Vec<Bolt>,
 }
 
 impl KeyboardConfig {
