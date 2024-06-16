@@ -8,14 +8,6 @@ use crate::{
     buttons_column::ButtonsColumn,
 };
 
-pub struct ButtonRec {
-    /// Padding of this button from previous button
-    additional_padding: Dec,
-    depth: Dec,
-    incline: Angle,
-    kind: ButtonMountKind,
-}
-
 pub struct ButtonsColumnBuilder {
     /// Curvature of button row - how round buttons are in plane of column
     curvature: Angle,
@@ -24,6 +16,7 @@ pub struct ButtonsColumnBuilder {
     incline: Angle,
 
     /// Shift in mm on the curvature circle (when curvature is zero - then just mm)
+    #[allow(unused)]
     radial_shift: Dec,
 
     /// Padding between buttons

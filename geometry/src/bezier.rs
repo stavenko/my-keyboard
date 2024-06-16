@@ -1,6 +1,3 @@
-// pub mod surface;
-//
-
 pub fn fact(n: usize) -> f32 {
     if n == 0 {
         1.

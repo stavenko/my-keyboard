@@ -13,7 +13,7 @@ pub struct RibId(pub(super) usize);
 pub struct Rib(pub(super) PtId, pub(super) PtId);
 
 impl Rib {
-    pub fn build(from: PtId, to: PtId) -> (Self, SegmentDir) {
+    pub(crate) fn build(from: PtId, to: PtId) -> (Self, SegmentDir) {
         if from > to {
             (Rib(to, from), SegmentDir::Rev)
         } else {

@@ -4,7 +4,7 @@ use num_traits::{One, Signed, Zero};
 use crate::{
     decimal::{Dec, STABILITY_ROUNDING},
     indexes::{
-        geo_index::{line::LineRef, rib::RibRef, seg::SegRef},
+        geo_index::{rib::RibRef, seg::SegRef},
         vertex_index::PtId,
     },
     linear::{line::Line, ray::Ray, segment::Segment},
@@ -28,34 +28,6 @@ impl Relation<Vector3<Dec>> for Line {
         let maybe_to = self.origin + self.dir * t0;
 
         if (to - self.origin)
-            .magnitude_squared()
-            .round_dp(STABILITY_ROUNDING)
-            .is_zero()
-        {
-            PointOnLine::Origin
-        } else if (to - maybe_to)
-            .magnitude_squared()
-            .round_dp(STABILITY_ROUNDING)
-            .is_zero()
-        {
-            PointOnLine::On
-        } else {
-            PointOnLine::Outside
-        }
-    }
-}
-
-impl<'a> Relation<PtId> for LineRef<'a> {
-    type Relate = PointOnLine;
-
-    fn relate(&self, to_pt: &PtId) -> Self::Relate {
-        let to = self.index.vertices.get_point(*to_pt);
-        let this = &self.index.lines[&self.line_id];
-        let origin = self.index.vertices.get_point(this.origin);
-        let q = to - origin;
-        let t0 = this.dir.dot(&q);
-        let maybe_to = origin + this.dir * t0;
-        if (to - origin)
             .magnitude_squared()
             .round_dp(STABILITY_ROUNDING)
             .is_zero()

@@ -19,7 +19,6 @@ use crate::{
 
 use super::{
     index::GeoIndex,
-    rib::RibRef,
     seg::{Seg, SegRef},
 };
 
@@ -289,24 +288,6 @@ impl<'a> PolyRef<'a> {
         })
     }
 
-    pub(crate) fn middle(&self) -> Vector3<Dec> {
-        let pts = self.index.get_polygon_vertices(self.poly_id);
-        pts.iter()
-            .map(Clone::clone)
-            .fold(Vector3::zeros(), |a, b| a + b)
-            / Dec::from(pts.len())
-    }
-
-    pub(crate) fn ribs(&self) -> impl Iterator<Item = RibRef<'_>> {
-        self.index
-            .get_polygon_ribs(&self.poly_id)
-            .into_iter()
-            .map(|rib_id| RibRef {
-                rib_id,
-                index: self.index,
-            })
-    }
-
     pub(crate) fn get_vertex(&self, v: crate::indexes::vertex_index::PtId) -> Vector3<Dec> {
         self.index.vertices.get_point(v)
     }
@@ -326,13 +307,6 @@ impl<'a> PolyRef<'a> {
 
     pub(crate) fn points(&self) -> HashSet<PtId> {
         self.index.get_polygon_points(self.poly_id)
-    }
-
-    pub(crate) fn is_vertex_in_polygon_bounds(&self, point: Vector3<Dec>) -> bool {
-        self.index
-            .polygon_bounding_boxes
-            .get(&self.poly_id)
-            .is_some_and(|bb| bb.is_point_inside(point))
     }
 
     pub(crate) fn has_chain(&self, chain: &[Seg]) -> bool {

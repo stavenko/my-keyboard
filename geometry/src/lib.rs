@@ -5,7 +5,6 @@ pub mod geometry;
 pub mod hyper_path;
 pub mod indexes;
 pub mod linear;
-pub mod measure_time;
 pub mod origin;
 pub mod parametric_iterator;
 pub mod path;

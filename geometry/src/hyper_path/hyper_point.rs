@@ -210,7 +210,7 @@ where
 {
     type Output = Self;
 
-    fn mul(self, rhs: Self) -> Self::Output {
+    fn mul(self, _rhs: Self) -> Self::Output {
         todo!();
     }
 }
@@ -221,7 +221,7 @@ where
 {
     type Output = Self;
 
-    fn mul(self, rhs: Self) -> Self::Output {
+    fn mul(self, _rhs: Self) -> Self::Output {
         todo!("Mul for super point");
     }
 }
@@ -293,15 +293,6 @@ where
             side_dir: self.side_dir - rhs.side_dir,
             point: self.point - rhs.point,
         }
-    }
-}
-
-impl<T> HyperPointT<T>
-where
-    T: nalgebra::Scalar + nalgebra::Field,
-{
-    pub(crate) fn side_dir(&self) -> Vector3<T> {
-        self.dir.cross(&self.normal)
     }
 }
 

@@ -2,7 +2,7 @@ use std::fmt;
 use std::ops::{Mul, Sub};
 
 use itertools::Itertools;
-use num_traits::{One, Pow, Zero};
+use num_traits::{One, Pow};
 
 use super::hyper_line::HyperLine;
 use super::hyper_point::Tensor;

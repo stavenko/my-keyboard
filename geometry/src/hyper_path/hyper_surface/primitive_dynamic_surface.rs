@@ -1,4 +1,4 @@
-use std::{ops::Div};
+use std::ops::Div;
 
 use nalgebra::Vector3;
 use num_traits::{One, Zero};
@@ -62,23 +62,12 @@ where
                 let c = self.1.get_t(tt);
                 let d = self.1.get_t(t);
                 match index.save_as_polygon(&[a, b, c], None) {
-                    Err(e) => {
-                        //dbg!(e);
-
-                        // do something
-                    }
-                    Ok(p) => {
-                        //dbg!(p);
-                    }
+                    Err(_) => {}
+                    Ok(_) => {}
                 }
                 match index.save_as_polygon(&[a, c, d], None) {
-                    Err(e) => {
-                        //dbg!(e);
-                        // do something
-                    }
-                    Ok(p) => {
-                        //dbg!(p);
-                    }
+                    Err(_) => {}
+                    Ok(_) => {}
                 }
             }
         }

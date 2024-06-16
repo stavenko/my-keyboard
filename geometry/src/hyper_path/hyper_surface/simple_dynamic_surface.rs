@@ -4,10 +4,6 @@ use std::{
     ops::{Add, Div, Mul},
 };
 
-use nalgebra::Vector3;
-use num_traits::Pow;
-use tap::TapFallible;
-
 use crate::{
     decimal::Dec,
     geometry::Geometry,
@@ -19,6 +15,8 @@ use crate::{
     },
     parametric_iterator::ParametricIterator,
 };
+use nalgebra::Vector3;
+use num_traits::Pow;
 
 use super::primitive_dynamic_surface::PrimitiveSurface;
 
@@ -55,24 +53,12 @@ where
         if self.0.is_linear() && self.1.is_linear() {
             let l1 = self.get_line_at(S::zero());
             let l2 = self.get_line_at(S::one());
-            let dl1 = format!("{l1:?}");
-            let dl2 = format!("{l2:?}");
-            PrimitiveSurface(l1, l2)
-                .polygonize(index, complexity)
-                .tap_err(|e| {
-                    println!("{dl1} \n{dl2}");
-                })?;
+            PrimitiveSurface(l1, l2).polygonize(index, complexity)?;
         } else {
             for (t, tt) in ParametricIterator::<S>::new(complexity) {
                 let l1 = self.get_line_at(t);
                 let l2 = self.get_line_at(tt);
-                let dl1 = format!("{l1:?}");
-                let dl2 = format!("{l2:?}");
-                PrimitiveSurface(l1, l2)
-                    .polygonize(index, complexity)
-                    .tap_err(|e| {
-                        println!("{dl1} \n{dl2}");
-                    })?;
+                PrimitiveSurface(l1, l2).polygonize(index, complexity)?;
             }
         }
         Ok(())

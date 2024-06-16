@@ -17,7 +17,7 @@ use super::{
 pub struct SegId(Uuid);
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub(super) enum SegmentDir {
+pub(crate) enum SegmentDir {
     Fow,
     Rev,
 }
@@ -90,18 +90,6 @@ impl<'a> SegRef<'a> {
             index: self.index,
             rib_id: self.rib_id,
         }
-    }
-
-    pub(crate) fn get(
-        &self,
-        b: Dec,
-    ) -> nalgebra::Matrix<
-        Dec,
-        nalgebra::Const<3>,
-        nalgebra::Const<1>,
-        nalgebra::ArrayStorage<Dec, 3, 1>,
-    > {
-        self.from() + self.dir() * b
     }
 
     pub(crate) fn flip(self) -> Self {

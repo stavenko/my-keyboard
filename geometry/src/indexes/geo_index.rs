@@ -1,5 +1,4 @@
 pub mod index;
-pub mod line;
 pub mod mesh;
 pub mod poly;
 pub mod rib;

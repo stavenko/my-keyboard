@@ -1,7 +1,7 @@
 use nalgebra::Vector3;
 use num_traits::{One, Zero};
 use rust_decimal_macros::dec;
-use std::{fs::OpenOptions};
+use std::fs::OpenOptions;
 
 use clap::Parser;
 
@@ -13,7 +13,7 @@ use geometry::{
         hyper_point::SuperPoint,
         split_hyper_line::SplitHyperLine,
     },
-    indexes::geo_index::{index::GeoIndex},
+    indexes::geo_index::index::GeoIndex,
 };
 use keyboard::{Angle, Button, ButtonsCollection, ButtonsColumn, RightKeyboardConfig};
 
@@ -22,17 +22,7 @@ mod cli;
 fn main() -> Result<(), anyhow::Error> {
     let cli = cli::Command::parse();
 
-    /*
-    let _m2_10 = Bolt {
-        nut: Some(keyboard::bolt_builder::Nut::hex_with_inner_diameter(4.0)),
-        diameter: 2.0,
-        height: 10.0,
-        head_diameter: 4.0,
-        head_height: 1.0,
-    };
-    */
-
-    let keyboard = RightKeyboardConfig::build()
+    let _keyboard = RightKeyboardConfig::build()
         .main(
             ButtonsCollection::build()
                 .column(
@@ -220,7 +210,7 @@ fn main() -> Result<(), anyhow::Error> {
     let index = GeoIndex::new();
 
     #[rustfmt::skip]
-    let p1: &[Vector3<Dec>] = &[
+    let _p1: &[Vector3<Dec>] = &[
     Vector3::new(dec!(20.6180339887).into(), dec!(12.4559581815).into(), dec!(3.8817317944).into()),
     Vector3::new(dec!(20.6180339887).into(), dec!(12.4560890688).into(), dec!(3.8826800212).into()),
     Vector3::new(dec!(20.6180339887).into(), dec!(12.9097762979).into(), dec!(7.1694655225).into()),
@@ -232,7 +222,7 @@ fn main() -> Result<(), anyhow::Error> {
     ];
 
     #[rustfmt::skip]
-    let p2: &[Vector3<Dec>] = &[
+    let _p2: &[Vector3<Dec>] = &[
     Vector3::new(dec!(18.6975304844).into(), dec!(14.1709823847).into(), dec!(3.5093506678).into() ),
     Vector3::new(dec!(18.8115659456).into(), dec!(13.7573368844).into(), dec!(3.7111817178).into() ),
     Vector3::new(dec!(20.6180339887).into(), dec!(12.4560890688).into(), dec!(3.8826800212).into() ),

@@ -8,9 +8,7 @@ use nalgebra::Vector3;
 use stl_io::Triangle;
 use tap::TapFallible;
 
-use crate::{
-    decimal::Dec,
-};
+use crate::decimal::Dec;
 
 use super::{
     index::{GeoIndex, PolygonRelation},
@@ -45,6 +43,7 @@ impl<'a> Deref for MeshRef<'a> {
     }
 }
 
+#[allow(unused)]
 impl<'a> MeshRef<'a> {
     pub(crate) fn polygons(&self) -> impl Iterator<Item = PolyRef<'a>> + 'a {
         self.geo_index.polygons(&self.mesh_id)
@@ -132,7 +131,7 @@ impl<'a> MeshRefMut<'a> {
         self.geo_index.polygons(&self.mesh_id)
     }
 
-    pub fn boolean_union(self, tool: MeshId) -> Vec<MeshRef<'a>> {
+    pub fn boolean_union(self, _tool: MeshId) -> Vec<MeshRef<'a>> {
         todo!();
     }
 

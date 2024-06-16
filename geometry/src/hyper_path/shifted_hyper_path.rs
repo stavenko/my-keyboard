@@ -4,7 +4,7 @@ use std::{
     ops::{Div, Mul, Sub},
 };
 
-use nalgebra::{Vector3};
+use nalgebra::Vector3;
 use num_traits::{One, Pow, Zero};
 
 use super::{
@@ -77,7 +77,7 @@ where
         todo!()
     }
 
-    fn map<F, R>(self, map: F) -> super::hyper_path::Root<R>
+    fn map<F, R>(self, _map: F) -> super::hyper_path::Root<R>
     where
         F: Fn(HyperLine<T>) -> HyperLine<R>,
     {
