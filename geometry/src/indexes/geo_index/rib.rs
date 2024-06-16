@@ -71,3 +71,9 @@ impl fmt::Debug for RibId {
         write!(f, "RibId:{}", self.0)
     }
 }
+
+impl PartialEq<usize> for RibId {
+    fn eq(&self, other: &usize) -> bool {
+        self.0 == *other
+    }
+}

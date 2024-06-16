@@ -1,7 +1,7 @@
 use std::{
     fmt::{self, Display},
     iter,
-    ops::{Add, AddAssign, Div, Mul, Sub},
+    ops::{Add, Div, Mul, Sub},
 };
 
 use nalgebra::{Dim, Matrix, Storage, Vector3};

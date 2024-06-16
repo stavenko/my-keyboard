@@ -196,8 +196,8 @@ impl Button {
                     self.inner_right_top(thickness),
                 ];
 
-                index.save_as_polygon(&top)?;
-                index.save_as_polygon(&bottom)?;
+                index.save_as_polygon(&top, None)?;
+                index.save_as_polygon(&bottom, None)?;
             }
             ButtonMountKind::Chok => {
                 let ps = self.kind.params();
@@ -274,14 +274,14 @@ impl Button {
                 ];
                 tt.reverse();
 
-                index.save_as_polygon(&top_pl1)?;
-                index.save_as_polygon(&top_pl2)?;
-                index.save_as_polygon(&top_pl3)?;
-                index.save_as_polygon(&top_pl4)?;
-                index.save_as_polygon(&tr)?;
-                index.save_as_polygon(&tl)?;
-                index.save_as_polygon(&tb)?;
-                index.save_as_polygon(&tt)?;
+                index.save_as_polygon(&top_pl1, None)?;
+                index.save_as_polygon(&top_pl2, None)?;
+                index.save_as_polygon(&top_pl3, None)?;
+                dbg!(">>>>", index.save_as_polygon(&top_pl4, None)?);
+                index.save_as_polygon(&tr, None)?;
+                index.save_as_polygon(&tl, None)?;
+                index.save_as_polygon(&tb, None)?;
+                index.save_as_polygon(&tt, None)?;
 
                 let inner_btn_width = ps.width + ps.around_button_padding;
                 let inner_btn_height = ps.height + ps.around_button_padding;
@@ -372,16 +372,16 @@ impl Button {
                     self.pt(Vector3::new(ps.lock_width / 2, ps.lock_height / 2, thickness / 2 - ps.lock_depth)),
                 ];
 
-                index.save_as_polygon(&bot_pl1)?;
-                index.save_as_polygon(&bot_pl2)?;
-                index.save_as_polygon(&bot_pl3)?;
-                index.save_as_polygon(&bot_pl4)?;
+                index.save_as_polygon(&bot_pl1, None)?;
+                index.save_as_polygon(&bot_pl2, None)?;
+                index.save_as_polygon(&bot_pl3, None)?;
+                index.save_as_polygon(&bot_pl4, None)?;
 
-                index.save_as_polygon(&bot2_pl)?;
-                index.save_as_polygon(&br)?;
-                index.save_as_polygon(&bl)?;
-                index.save_as_polygon(&bb)?;
-                index.save_as_polygon(&bt)?;
+                index.save_as_polygon(&bot2_pl, None)?;
+                index.save_as_polygon(&br, None)?;
+                index.save_as_polygon(&bl, None)?;
+                index.save_as_polygon(&bb, None)?;
+                index.save_as_polygon(&bt, None)?;
             }
             _ => todo!("Implement mesh for chok and cherry"),
         }

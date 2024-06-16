@@ -1,5 +1,3 @@
-#![allow(warnings)]
-
 use nalgebra::Vector3;
 use num_traits::{One, Zero};
 use rust_decimal_macros::dec;
@@ -16,10 +14,7 @@ use geometry::{
         hyper_point::SuperPoint,
         split_hyper_line::SplitHyperLine,
     },
-    indexes::geo_index::{
-        index::GeoIndex,
-        mesh::{self, MeshRefMut},
-    },
+    indexes::geo_index::{index::GeoIndex, mesh},
     origin::Origin,
     shapes,
 };
@@ -227,58 +222,45 @@ fn main() -> Result<(), anyhow::Error> {
 
     let mut index = GeoIndex::new();
 
-    keyboard.inner_wall_surface(&mut index).unwrap();
+    #[rustfmt::skip]
+    let p1: &[Vector3<Dec>] = &[
+    Vector3::new(dec!(20.6180339887).into(), dec!(12.4559581815).into(), dec!(3.8817317944).into()),
+    Vector3::new(dec!(20.6180339887).into(), dec!(12.4560890688).into(), dec!(3.8826800212).into()),
+    Vector3::new(dec!(20.6180339887).into(), dec!(12.9097762979).into(), dec!(7.1694655225).into()),
+    Vector3::new(dec!(21.6180339887).into(), dec!(12.1900579255).into(), dec!(7.2688109267).into()),
+    Vector3::new(dec!(21.6180339887).into(), dec!(11.7365480016).into(), dec!(3.9833099320).into()),
+    Vector3::new(dec!(20.9079214406).into(), dec!(12.2474101976).into(), dec!(3.9111780219).into()),
+    Vector3::new(dec!(20.7607867695).into(), dec!(12.3532603778).into(), dec!(3.8962323560).into()),
 
-    keyboard.outer_wall_surface(&mut index).unwrap();
+    ];
 
-    keyboard.buttons(&mut index).unwrap();
+    #[rustfmt::skip]
+    let p2: &[Vector3<Dec>] = &[
+    Vector3::new(dec!(18.6975304844).into(), dec!(14.1709823847).into(), dec!(3.5093506678).into() ),
+    Vector3::new(dec!(18.8115659456).into(), dec!(13.7573368844).into(), dec!(3.7111817178).into() ),
+    Vector3::new(dec!(20.6180339887).into(), dec!(12.4560890688).into(), dec!(3.8826800212).into() ),
+    Vector3::new(dec!(20.7607867695).into(), dec!(12.3532603778).into(), dec!(3.8962323560).into() ),
+    ];
 
-    keyboard.fill_between_buttons(&mut index).unwrap();
-
-    keyboard
-        .inner_outer_surface_table_connection(&mut index)
-        .unwrap();
-
-    let o = Origin::new()
-        .offset_x(Dec::from(20))
-        .offset_y(Dec::from(10));
-
-    let x = o.x();
-    let o = o.rotate_axisangle(x * Dec::from(14));
-
-    let b = Basis::new(o.x(), o.y(), o.z(), o.center).unwrap();
-
-    let mm = index.get_current_default_mesh();
-
-    let mesh_id = index.save_mesh(
-        shapes::cylinder(b, Dec::from(15), Dec::from(2), 10)
-            .into_iter()
-            .take(10)
-            .map(Cow::Owned),
-    );
-
-    {
-        let mutm = index.get_mutable_mesh(mm);
-        if let Err(e) = mutm.boolean_diff(mesh_id) {
-            dbg!("~~~~", e);
-        }
-    }
-
-    //index.flip_intersected_polygons();
-    /*
-
-    // index.create_default_mesh();
-
-    */
-    //index.flip_polygons_with_common_ribs();
-
-    //let mut k = index.get_mutable_mesh(mm);
-    //k.remove();
+    //let p1 = index.save_as_polygon(p1).unwrap();
+    //let p2 = index.save_as_polygon(p2).unwrap();
 
     /*
-     */
-    //let m = index.get_mesh(mm);
-    //
+         * [smol/src/main.rs:275:13] index.load_polygon_ref(p) = 20.6180339887 12.4559581815 3.8817317944 -> 20.6180339887 12.4560890688 3.8826800212
+    20.6180339887 12.4560890688 3.8826800212 -> 20.6180339887 12.9097762979 7.1694655225
+    20.6180339887 12.9097762979 7.1694655225 -> 21.6180339887 12.1900579255 7.2688109267
+    21.6180339887 12.1900579255 7.2688109267 -> 21.6180339887 11.7365480016 3.9833099320
+    21.6180339887 11.7365480016 3.9833099320 -> 20.9079214406 12.2474101976 3.9111780219
+    20.9079214406 12.2474101976 3.9111780219 -> 20.7607867695 12.3532603778 3.8962323560
+    20.7607867695 12.3532603778 3.8962323560 -> 20.6180339887 12.4559581815 3.8817317944
+    [smol/src/main.rs:276:13] "~~~~" = "~~~~"
+    [smol/src/main.rs:276:13] index.load_polygon_ref(pp) =
+    18.6975304844 14.1709823847 3.5093506678 -> 18.8115659456 13.7573368844 3.7111817178
+    18.8115659456 13.7573368844 3.7111817178 -> 20.6180339887 12.4560890688 3.8826800212
+    20.6180339887 12.4560890688 3.8826800212 -> 20.7607867695 12.3532603778 3.8962323560
+    20.7607867695 12.3532603778 3.8962323560 -> 18.6975304844 14.1709823847 3.5093506678
+    [geometry/src/indexes/geo_index/index.rs:2084:20] triangles.len() = 3102
+         * */
 
     let mut writer = OpenOptions::new()
         .write(true)

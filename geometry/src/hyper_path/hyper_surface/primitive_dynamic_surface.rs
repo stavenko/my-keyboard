@@ -50,10 +50,10 @@ where
             let b = self.0.get_t(tt);
             let c = self.1.get_t(tt);
             let d = self.1.get_t(t);
-            if index.save_as_polygon(&[a, b, c]).is_err() {
+            if index.save_as_polygon(&[a, b, c], None).is_err() {
                 // do something
             }
-            if index.save_as_polygon(&[a, c, d]).is_err() {
+            if index.save_as_polygon(&[a, c, d], None).is_err() {
                 // do something
             }
         } else {
@@ -62,7 +62,7 @@ where
                 let b = self.0.get_t(tt);
                 let c = self.1.get_t(tt);
                 let d = self.1.get_t(t);
-                match index.save_as_polygon(&[a, b, c]) {
+                match index.save_as_polygon(&[a, b, c], None) {
                     Err(e) => {
                         //dbg!(e);
 
@@ -72,7 +72,7 @@ where
                         //dbg!(p);
                     }
                 }
-                match index.save_as_polygon(&[a, c, d]) {
+                match index.save_as_polygon(&[a, c, d], None) {
                     Err(e) => {
                         //dbg!(e);
                         // do something

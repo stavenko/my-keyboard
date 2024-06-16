@@ -1,14 +1,13 @@
 use core::fmt;
 use std::{
     fmt::{Debug, Display},
-    ops::{Add, AddAssign, Div, Mul, Sub},
-    process::Output,
+    ops::{Add, Div, Mul, Sub},
 };
 
 use nalgebra::Vector3;
 use num_traits::{One, Pow, Zero};
 
-use crate::{decimal::Dec, parametric_iterator::ParametricIterator};
+use crate::parametric_iterator::ParametricIterator;
 
 use super::{
     hyper_path::IsLinear,

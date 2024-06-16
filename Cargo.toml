@@ -5,6 +5,8 @@ members = [
   "keyboard", 
   "smol", 
   "stand", 
-  "ergoton"]
-
+  "ergoton",
+#  "mcut",
+# "mcut-sys"
+]
 

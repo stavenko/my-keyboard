@@ -2,7 +2,6 @@ pub mod basis;
 pub mod bezier;
 pub mod decimal;
 pub mod geometry;
-//pub mod hull;
 pub mod hyper_path;
 pub mod indexes;
 pub mod linear;

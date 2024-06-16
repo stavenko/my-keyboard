@@ -15,9 +15,7 @@ use geometry::{
     },
     indexes::geo_index::index::GeoIndex,
 };
-use keyboard::{
-    Angle, Button, ButtonMountKind, ButtonsCollection, ButtonsColumn, RightKeyboardConfig,
-};
+use keyboard::{Angle, Button, ButtonsCollection, ButtonsColumn, RightKeyboardConfig};
 
 mod cli;
 
@@ -320,7 +318,7 @@ fn main() -> Result<(), anyhow::Error> {
         )
         .build();
 
-    let mut index = GeoIndex::default();
+    let mut index = GeoIndex::new();
 
     keyboard.buttons(&mut index).unwrap();
     keyboard.inner_wall_surface(&mut index).unwrap();

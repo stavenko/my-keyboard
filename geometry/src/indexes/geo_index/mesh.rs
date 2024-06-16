@@ -1,20 +1,22 @@
-use std::{collections::HashSet, iter, ops::Deref};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    ops::Deref,
+};
 
 use itertools::Itertools;
 use nalgebra::Vector3;
+use num_traits::Signed;
 use stl_io::Triangle;
 use tap::TapFallible;
-use uuid::Uuid;
 
 use crate::{
     decimal::Dec,
-    indexes::geo_index::poly::Side,
-    measure_time::print_time,
-    primitives_relation::{point_volume::PointVolumeRelation, relation::Relation},
+    indexes::{geo_index::poly::Side, vertex_index::PtId},
+    planar::polygon::Polygon,
 };
 
 use super::{
-    index::GeoIndex,
+    index::{GeoIndex, PolygonRelation},
     poly::{PolyId, PolyRef},
     rib::{RibId, RibRef},
     tri_iter::TriIter,
@@ -26,7 +28,13 @@ pub struct Mesh(pub(super) Vec<PolyId>);
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct MeshId(pub(super) usize);
 
-#[derive(Debug)]
+impl PartialEq<usize> for MeshId {
+    fn eq(&self, other: &usize) -> bool {
+        self.0 == *other
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct MeshRef<'a> {
     pub(super) geo_index: &'a GeoIndex,
     pub(super) mesh_id: MeshId,
@@ -66,13 +74,13 @@ impl<'a> MeshRef<'a> {
     pub(crate) fn get_poly_ref(&self, poly1: PolyId) -> PolyRef<'a> {
         PolyRef {
             poly_id: poly1,
-            index: &self.geo_index,
+            index: self.geo_index,
         }
     }
 
     pub(crate) fn get_rib_ref(&self, rib: RibId) -> RibRef<'a> {
         RibRef {
-            index: &self.geo_index,
+            index: self.geo_index,
             rib_id: rib,
         }
     }
@@ -123,162 +131,83 @@ impl<'a> IntoIterator for MeshRef<'a> {
 }
 
 impl<'a> MeshRefMut<'a> {
-    pub fn boolean_union(self, tool: MeshId) -> Vec<MeshRef<'a>> {
-        println!("==== start boolean union ====");
-        //let tool_mesh_id = tool;
-        let mut checkpoint = std::time::Instant::now();
-        let tot = checkpoint;
-        // let tool_mesh_id = self.geo_index.save_mesh(tool.sides());
-        let mut total_splitted_polygons = 0;
-
-        while let Some((poly, tool)) = self.geo_index.find_first_intersection(&tool) {
-            let plane = self.geo_index.calculate_polygon_plane(tool);
-            self.geo_index.split_poly_by_plane(poly, &plane);
-            total_splitted_polygons += 1;
-        }
-        //checkpoint = print_time("find intersection in my", checkpoint);
-
-        while let Some((poly, tool)) = self.geo_index.find_first_intersection(&self.mesh_id) {
-            let plane = self.geo_index.calculate_polygon_plane(tool);
-            self.geo_index.split_poly_by_plane(poly, &plane);
-            total_splitted_polygons += 1;
-            /*
-            self.geo_index.wtf_wtf_wtf();
-            if total_splitted_polygons == 5 {
-                return vec![self.geo_index.get_mesh(tool_mesh_id)];
-            }
-            */
-        }
-
-        //panic!("DEB");
-        //checkpoint = print_time("find intersection in tool", checkpoint);
-        println!("Total splitted: {total_splitted_polygons}");
-
-        /*
-                let my_vertices = self.geo_index.get_mesh_vertices(self.mesh_id);
-                let my_vertices_inside_tool = my_vertices.iter().any(|v| {
-                    matches!(
-                        self.geo_index.is_point_inside_mesh(v, tool),
-                        PointVolumeRelation::In
-                    )
-                });
-                let tool_vertices = self.geo_index.get_mesh_vertices(tool);
-
-                let tool_vertices_inside_me = my_vertices.iter().any(|v| {
-                    matches!(
-                        self.geo_index.is_point_inside_mesh(v, tool),
-                        PointVolumeRelation::In
-                    )
-                });
-
-        */
-        let to_drop_inside_tool = self.geo_index.find_insides(self.mesh_id, tool);
-        //checkpoint = print_time("find dropped polygons #1", checkpoint);
-        let to_drop_inside_self = self.geo_index.find_insides(tool, self.mesh_id);
-        //checkpoint = print_time("find dropped polygons #2", checkpoint);
-        let total_polygons_to_remove = to_drop_inside_self
-            .into_iter()
-            .chain(to_drop_inside_tool)
-            .collect_vec();
-        println!(
-            "Found polygons to remove {}",
-            total_polygons_to_remove.len()
-        );
-
-        self.geo_index
-            .drop_polygons(total_polygons_to_remove.into_iter());
-        //checkpoint = print_time("drop polygons", checkpoint);
-
-        if self.geo_index.has_common_ribs() {
-            self.geo_index.remove_opposites_and_collapse_sames();
-            checkpoint = print_time("drop opposites", checkpoint);
-        }
-
-        if self.geo_index.has_common_ribs() {
-            self.geo_index.inspect_common_ribs();
-            panic!("Something is wrong");
-        }
-
-        let meshes = self.geo_index.collect_meshes();
-        print_time("collect", checkpoint);
-        print_time("total", tot);
-
-        meshes
+    pub(crate) fn polygons(&'a self) -> impl Iterator<Item = PolyRef<'a>> + 'a {
+        self.geo_index.polygons(&self.mesh_id)
     }
 
-    pub fn boolean_diff(self, tool: MeshId) -> Result<Vec<MeshRef<'a>>, (PolyId, PolyId)> {
-        // insert tool polygons in index
-        //let tool_mesh_id = self.geo_index.save_mesh(tool.sides());
+    pub fn boolean_union(self, tool: MeshId) -> Vec<MeshRef<'a>> {
+        todo!();
+    }
 
-        let mut ps_cutted = HashSet::new();
-        while let Some((poly, tool)) = self.geo_index.find_first_intersection(&tool) {
-            // dbg!("aaa");
-            let plane = self.geo_index.calculate_polygon_plane(tool);
-            ps_cutted.insert(poly);
-            match self.geo_index.split_poly_by_plane(poly, &plane) {
-                Ok(ps) => ps_cutted.extend(ps),
-                Err(_) => {
-                    return Err((poly, tool));
-                }
-            };
-        }
-
-        while let Some((poly, tool)) = self.geo_index.find_first_intersection(&self.mesh_id) {
-            let plane = self.geo_index.calculate_polygon_plane(tool);
-
-            match self.geo_index.split_poly_by_plane(poly, &plane) {
-                Ok(ps) => ps_cutted.extend(ps),
-                Err(_) => {
-                    return Err((poly, tool));
-                }
-            };
-        }
-        dbg!("@");
-
-        let ps1 = self
-            .geo_index
-            .mark_based_on_cutted_polygons(self.mesh_id, tool, Side::Front);
-
-        let ps = self
-            .geo_index
-            .mark_based_on_cutted_polygons(tool, self.mesh_id, Side::Back);
-
-        let lll = dbg!(ps_cutted.len());
-        //self.geo_index.drop_polygons(ps1.into_iter().chain(ps));
-        let around_ribs = ps1.into_iter().chain(ps).collect::<HashSet<_>>();
-        dbg!(&around_ribs);
-        let ccc = ps_cutted
-            .difference(&around_ribs)
-            .filter(|p| self.geo_index.polygons.contains_key(p))
-            .collect_vec();
-        let lll = ccc.len();
-
-        dbg!(lll);
-        for p in ccc.iter() {
-            for r in self.geo_index.get_polygon_ribs(p) {
-                if self.geo_index.rib_to_poly[&r].len() == 3 {
-                    panic!("WTF!");
+    fn mark_polygons(&self, mesh: MeshId, visited: &mut BTreeMap<PolyId, PolygonRelation>) {
+        let mut polygons: VecDeque<PolyId> = self.geo_index.meshes[&mesh].0.clone().into();
+        while let Some(polygon_id) = polygons.pop_front() {
+            if visited.contains_key(&polygon_id) {
+                continue;
+            }
+            let mut is_found = false;
+            for r in self.geo_index.polygons[&polygon_id]
+                .segments
+                .iter()
+                .map(|s| s.rib_id)
+            {
+                if let Some(p) = self.geo_index.rib_to_poly[&r].iter().find(|pp| {
+                    self.geo_index.get_mesh_for_polygon(**pp) == self.mesh_id && **pp != polygon_id
+                }) {
+                    if visited.contains_key(p) {
+                        visited.insert(polygon_id, visited[&p]);
+                        is_found = true;
+                        break;
+                    }
                 }
             }
+            if !is_found {
+                // println!("push back poly {polygon_id:?}");
+                polygons.push_back(polygon_id);
+            }
+        }
+    }
 
-            self.geo_index.flip_polygon(**p);
-            println!("{:?}", p);
+    pub fn boolean_diff(self, tool: MeshId) -> anyhow::Result<()> {
+        let common_chains = self.geo_index.collect_common_chains(self.mesh_id, tool);
+        let mut visited = BTreeMap::new();
+
+        for chain in common_chains {
+            visited.extend(self.geo_index.mark_polygons_around_common_chain(
+                chain,
+                self.mesh_id,
+                tool,
+            ));
         }
 
-        //self.geo_index.drop_polygons(ps.into_iter());
-        /*
-        let to_drop_inside_tool = self.geo_index.find_insides(self.mesh_id, tool);
-        let to_drop_outside_self = self.geo_index.find_outsides(tool, self.mesh_id);
+        self.mark_polygons(self.mesh_id, &mut visited);
+        self.mark_polygons(tool, &mut visited);
 
-        self.geo_index
-            .drop_polygons(to_drop_outside_self.into_iter().chain(to_drop_inside_tool));
+        for (poly_id, relation) in visited.into_iter() {
+            match relation {
+                PolygonRelation::SrcPolygonFrontOfTool => {}
+                PolygonRelation::SrcPolygonBackOfTool => {
+                    self.geo_index.remove_polygon(poly_id);
+                }
+                PolygonRelation::ToolPolygonBackOfSrc => {
+                    self.geo_index.flip_polygon(poly_id);
+                    self.geo_index.move_polygon(poly_id, self.mesh_id);
+                }
+                PolygonRelation::ToolPolygonFrontOfSrc => {
+                    self.geo_index.remove_polygon(poly_id);
+                }
+            }
+        }
+        if self.geo_index.meshes[&tool].0.is_empty() {
+            self.geo_index.remove_mesh(tool);
+        }
 
-        */
-        self.geo_index.remove_opposites_and_collapse_sames();
+        Ok(())
+    }
 
-        self.geo_index.inverse_mesh(tool);
-
-        //self.geo_index.join_mesh_bounds_in_same_plane();
-        Ok(self.geo_index.collect_meshes())
+    pub fn remove(&mut self) {
+        let polygon_ids = self.polygons().map(|p| p.poly_id).collect_vec();
+        self.geo_index.drop_polygons(polygon_ids.into_iter());
+        self.geo_index.remove_mesh(self.mesh_id);
     }
 }

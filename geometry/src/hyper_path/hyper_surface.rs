@@ -55,7 +55,7 @@ mod tests {
         );
         let hp2 = Root::new().push_back(l2);
         let hs = DynamicSurface::new(hp, hp2);
-        let mut ix = GeoIndex::default();
+        let mut ix = GeoIndex::new();
         hs.polygonize(&mut ix, 10).unwrap();
     }
 
@@ -112,7 +112,7 @@ mod tests {
                 },
             ));
         let hs = DynamicSurface::new(hp, hp2);
-        let mut ix = GeoIndex::default();
+        let mut ix = GeoIndex::new();
         hs.polygonize(&mut ix, 10).unwrap();
     }
     #[test]
@@ -180,7 +180,7 @@ mod tests {
                 },
             ));
         let hs = DynamicSurface::new(hp2, hp);
-        let mut ix = GeoIndex::default();
+        let mut ix = GeoIndex::new();
         hs.polygonize(&mut ix, 10).unwrap();
     }
 
@@ -249,7 +249,7 @@ mod tests {
                 },
             ));
         let hs = DynamicSurface::new(hp, hp2);
-        let mut ix = GeoIndex::default();
+        let mut ix = GeoIndex::new();
         hs.polygonize(&mut ix, 10).unwrap();
     }
     /*
@@ -298,7 +298,7 @@ mod tests {
         );
         let hp2 = hp2.push_back(l3);
         let hs = HyperSurface(hp, hp2);
-        let mut ix = GeoIndex::default();
+        let mut ix = GeoIndex::new();
         hs.polygonize(&mut ix, 10).unwrap();
         assert!(false);
     }

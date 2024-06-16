@@ -238,7 +238,6 @@ impl RightKeyboardConfig {
             point: thumb_point_mutual.point,
         };
 
-        dbg!(a, b, c, d);
         HyperLine::new_4(a, b, c, d)
     }
 

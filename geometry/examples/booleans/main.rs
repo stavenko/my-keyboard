@@ -1,3 +1,4 @@
+/*
 use std::{
     borrow::Cow,
     fs::{self, OpenOptions},
@@ -11,9 +12,11 @@ use geometry::{
     indexes::geo_index::index::GeoIndex,
     shapes,
 };
+
 use nalgebra::{UnitQuaternion, UnitVector3, Vector3};
 use num_traits::One;
 use rust_decimal_macros::dec;
+
 
 #[derive(Parser)]
 pub struct Command {
@@ -22,7 +25,7 @@ pub struct Command {
 }
 
 fn bigger_by_smaller(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
-    let mut index = GeoIndex::default();
+    let mut index = GeoIndex::new();
 
     let zz = Vector3::z();
     let yy = Vector3::y();
@@ -62,7 +65,7 @@ fn bigger_by_smaller(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
 }
 
 fn smaller_by_bigger(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
-    let mut index = GeoIndex::default();
+    let mut index = GeoIndex::new();
     let zz = Vector3::z();
     let yy = Vector3::y();
     let xx = yy.cross(&zz).normalize();
@@ -103,7 +106,7 @@ fn smaller_by_bigger(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
 fn two_identical_boxes_with_overlapped_side_and_rotated(
     file_root: PathBuf,
 ) -> anyhow::Result<Vec<String>> {
-    let mut index = GeoIndex::default();
+    let mut index = GeoIndex::new();
     let x_basis_one = Basis::new(Vector3::x(), Vector3::y(), Vector3::z(), Vector3::zeros())?;
 
     let box_one = index.save_mesh(
@@ -159,7 +162,7 @@ fn two_identical_boxes_with_overlapped_side_and_rotated(
 fn two_identical_boxes_one_with_one_common_side_rotated(
     file_root: PathBuf,
 ) -> anyhow::Result<Vec<String>> {
-    let mut index = GeoIndex::default();
+    let mut index = GeoIndex::new();
     let x_basis_one = Basis::new(Vector3::x(), Vector3::y(), Vector3::z(), Vector3::zeros())?;
 
     let box_one = index.save_mesh(
@@ -213,7 +216,7 @@ fn two_identical_boxes_one_with_one_common_side_rotated(
     Ok(vec![filename.into()])
 }
 fn two_identical_boxes_one_with_one_common_side(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
-    let mut index = GeoIndex::default();
+    let mut index = GeoIndex::new();
     let x_basis_one = Basis::new(Vector3::x(), Vector3::y(), Vector3::z(), Vector3::zeros())?;
 
     let box_one = index.save_mesh(
@@ -263,7 +266,7 @@ fn two_identical_boxes_one_with_one_common_side(file_root: PathBuf) -> anyhow::R
 }
 
 fn two_identical_boxes_one_with_overlap(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
-    let mut index = GeoIndex::default();
+    let mut index = GeoIndex::new();
     let x_basis_one = Basis::new(Vector3::x(), Vector3::y(), Vector3::z(), Vector3::zeros())?;
 
     let box_one = index.save_mesh(
@@ -313,7 +316,7 @@ fn two_identical_boxes_one_with_overlap(file_root: PathBuf) -> anyhow::Result<Ve
 }
 
 fn two_identical_boxes_one_shifted_in_plane(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
-    let mut index = GeoIndex::default();
+    let mut index = GeoIndex::new();
     let x_basis_one = Basis::new(Vector3::x(), Vector3::y(), Vector3::z(), Vector3::zeros())?;
 
     let box_one = index.save_mesh(
@@ -364,7 +367,7 @@ fn two_identical_boxes_one_shifted_in_plane(file_root: PathBuf) -> anyhow::Resul
 }
 
 fn two_identical_boxes_one_shifted_in_space(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
-    let mut index = GeoIndex::default();
+    let mut index = GeoIndex::new();
     let x_basis_one = Basis::new(Vector3::x(), Vector3::y(), Vector3::z(), Vector3::zeros())?;
 
     let box_one = index.save_mesh(
@@ -416,7 +419,7 @@ fn two_identical_boxes_one_shifted_in_space(file_root: PathBuf) -> anyhow::Resul
 }
 
 fn bigger_box_extended_by_smaller(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
-    let mut index = GeoIndex::default();
+    let mut index = GeoIndex::new();
     let x_basis_one = Basis::new(Vector3::x(), Vector3::y(), Vector3::z(), Vector3::zeros())?;
 
     let box_one = index.save_mesh(
@@ -467,7 +470,7 @@ fn bigger_box_extended_by_smaller(file_root: PathBuf) -> anyhow::Result<Vec<Stri
 }
 
 fn bigger_box_extended_by_longer(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
-    let mut index = GeoIndex::default();
+    let mut index = GeoIndex::new();
     let x_basis_one = Basis::new(Vector3::x(), Vector3::y(), Vector3::z(), Vector3::zeros())?;
 
     let box_one = index.save_mesh(
@@ -516,7 +519,7 @@ fn bigger_box_extended_by_longer(file_root: PathBuf) -> anyhow::Result<Vec<Strin
 }
 
 fn smaller_box_cutted_by_bigger(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
-    let mut index = GeoIndex::default();
+    let mut index = GeoIndex::new();
     let x_basis_one = Basis::new(Vector3::x(), Vector3::y(), Vector3::z(), Vector3::zeros())?;
 
     let box_one = index.save_mesh(
@@ -566,7 +569,7 @@ fn smaller_box_cutted_by_bigger(file_root: PathBuf) -> anyhow::Result<Vec<String
 }
 
 fn smaller_box_cutted_by_longer(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
-    let mut index = GeoIndex::default();
+    let mut index = GeoIndex::new();
     let x_basis_one = Basis::new(Vector3::x(), Vector3::y(), Vector3::z(), Vector3::zeros())?;
 
     let box_one = index.save_mesh(
@@ -616,7 +619,7 @@ fn smaller_box_cutted_by_longer(file_root: PathBuf) -> anyhow::Result<Vec<String
 }
 
 fn smaller_box_cutted_by_bigger_in_two(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
-    let mut index = GeoIndex::default();
+    let mut index = GeoIndex::new();
     let x_basis_one = Basis::new(Vector3::x(), Vector3::y(), Vector3::z(), Vector3::zeros())?;
 
     let box_one = index.save_mesh(
@@ -679,14 +682,15 @@ fn smaller_box_cutted_by_bigger_in_two(file_root: PathBuf) -> anyhow::Result<Vec
     stl_io::write_stl(&mut writer, r.into_iter())?;
     Ok(paths)
 }
+*/
 
 fn main() -> Result<(), anyhow::Error> {
+    /*
     let cli = Command::parse();
 
     fs::create_dir_all(cli.output_path.clone())?;
     let paths = vec![
         /*
-         */
         bigger_by_smaller(cli.output_path.clone())?,
         smaller_by_bigger(cli.output_path.clone())?,
         two_identical_boxes_one_with_one_common_side(cli.output_path.clone())?,
@@ -700,6 +704,7 @@ fn main() -> Result<(), anyhow::Error> {
         smaller_box_cutted_by_bigger(cli.output_path.clone())?,
         smaller_box_cutted_by_bigger_in_two(cli.output_path.clone())?,
         smaller_box_cutted_by_longer(cli.output_path.clone())?,
+         */
         /*
          */
     ]
@@ -728,5 +733,6 @@ fn main() -> Result<(), anyhow::Error> {
 
     fs::write(cli.output_path.join("tot.scad"), file_content).unwrap();
 
+    */
     Ok(())
 }

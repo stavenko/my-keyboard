@@ -1,3 +1,4 @@
+#![allow(warnings)]
 mod angle;
 mod bolt;
 mod bolt_builder;

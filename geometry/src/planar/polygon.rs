@@ -336,6 +336,10 @@ impl Polygon {
             plane = plane.flip();
         }
 
+        if total_area.is_zero() {
+            return Err(anyhow!("Zero area"));
+        }
+
         Ok(plane)
     }
 
@@ -429,7 +433,8 @@ impl Polygon {
 
     pub fn new(vertices: Vec<Vector3<Dec>>) -> anyhow::Result<Self> {
         let plane = Self::calculate_plane(&vertices)?;
-        Ok(Self { vertices, plane })
+        let this = Self { vertices, plane };
+        Ok(this)
     }
 
     pub fn new_with_plane(vertices: Vec<Vector3<Dec>>, plane: Plane) -> anyhow::Result<Self> {

@@ -3,7 +3,7 @@ use num_traits::{One, Signed, Zero};
 
 use crate::{
     decimal::{Dec, NORMAL_DOT_ROUNDING, STABILITY_ROUNDING},
-    indexes::{geo_index::seg::SegRef, vertex_index::PtId},
+    indexes::geo_index::seg::SegRef,
     linear::{line::Line, ray::Ray, segment::Segment},
 };
 
@@ -186,6 +186,7 @@ impl<'a> Relation<SegRef<'a>> for Line {
                 } else if y.is_one() {
                     LinearRefRelation::Intersect(LinearRefIntersection::One)
                 } else {
+                    println!("{}", (st.y / to.dir().magnitude()));
                     LinearRefRelation::Intersect(LinearRefIntersection::In(st.x, st.y))
                 }
             } else {

@@ -361,7 +361,11 @@ impl<'a> Relation<PolyRef<'a>> for Line {
                                 vertices.push(v);
                             }
                         }
-                        LinearRefRelation::Intersect(LinearRefIntersection::In(v, _)) => {
+                        LinearRefRelation::Intersect(LinearRefIntersection::In(v, w)) => {
+                            dbg!("!!!!!!!!!!!!!!!!!!!");
+                            dbg!(v);
+                            dbg!(w);
+
                             let v = self.origin + self.dir * v;
                             ribs.push((*segment.rib(), v))
                         }

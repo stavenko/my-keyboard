@@ -1,21 +1,17 @@
-use std::{
-    collections::HashSet,
-    fmt::{self, write},
-};
+use std::{collections::HashSet, fmt};
 
 use itertools::Itertools;
-use nalgebra::{ComplexField, RealField, Vector2, Vector3};
+use nalgebra::{Vector2, Vector3};
 use num_traits::Zero;
 use rand::Rng;
 use rstar::{Point, RTreeObject, AABB};
 use stl_io::{Triangle, Vector};
 use tap::TapFallible;
-use uuid::Uuid;
 
 use crate::{
     decimal::Dec,
-    indexes::{aabb::Aabb, quadtree::Quadtree, vertex_index::PtId},
-    linear::{segment::Segment, segment2d::Segment2D},
+    indexes::{aabb::Aabb, vertex_index::PtId},
+    linear::segment2d::Segment2D,
     planar::plane::Plane,
     polygon_basis::PolygonBasis,
     primitives::Face,
@@ -110,15 +106,15 @@ impl<'a> PolyRef<'a> {
             if ix <= 2 {
                 items.push(format!(
                     "<circle cx=\"{}\" cy=\"{}\" r=\"0.08\" fill=\"{}\"/> ",
-                    vv.x.round_dp(4),
-                    vv.y.round_dp(4),
+                    vv.x.round_dp(9),
+                    vv.y.round_dp(9),
                     colors[ix],
                 ))
             }
             if ix == 0 {
-                path.push(format!("M {} {}", vv.x.round_dp(4), vv.y.round_dp(4)));
+                path.push(format!("M {} {}", vv.x.round_dp(9), vv.y.round_dp(9)));
             } else {
-                path.push(format!("L {} {}", vv.x.round_dp(4), vv.y.round_dp(4)));
+                path.push(format!("L {} {}", vv.x.round_dp(9), vv.y.round_dp(9)));
             }
         }
         path.push("z".to_string());
@@ -166,13 +162,6 @@ impl<'a> PolyRef<'a> {
             })
             .collect();
 
-        //let linearized = index.linearize();
-        //if contour.len() == 15 {
-        //dbg!(contour.len());
-        //dbg!(&contour);
-        //dbg!(contour.iter().map(|i| linearized[*i]).collect_vec());
-        //}
-
         if let Some(first) = contour.first() {
             contour.push(*first);
         }
@@ -183,18 +172,37 @@ impl<'a> PolyRef<'a> {
         }
 
         let tup_array: Vec<_> = index
-            .into_iter()
+            .iter()
             .map(|v| (v.x.round_dp(9).into(), v.y.round_dp(9).into()))
             .collect();
 
         let c_len = contour.len();
+        if c_len == 3 {
+            dbg!(self.poly_id);
+        }
         let contours = vec![contour];
         let mut t = cdt::Triangulation::new_from_contours(&tup_array, &contours).tap_err(|e| {
             panic!("{}", e);
         })?;
         while !t.done() {
             t.step().tap_err(|e| {
-                panic!("{}", e);
+                dbg!(self.poly_id);
+                let vertices = self
+                    .segments_2d_iter(&basis)
+                    .map(|s| s.from * Dec::from(10))
+                    .collect_vec();
+                let svg = self.svg_debug(vertices);
+                let pts = self.points();
+                for pt in &pts {
+                    let v = self.index.vertices.get_point(*pt);
+                    println!("{}, {}, {}", v.x, v.y, v.z);
+                }
+                let vvvs: Vec<_> = index.iter().map(|v| (v.x, v.y)).collect();
+                for (x, y) in vvvs {
+                    println!("{}, {}", x, y);
+                }
+
+                panic!("~~~\n\n{svg}+++++\n\n{pts:?}\n\n{e}");
             })?;
         }
 
@@ -242,7 +250,7 @@ impl<'a> PolyRef<'a> {
         Ok(result)
     }
 
-    fn calculate_polygon_basis(&self) -> PolygonBasis {
+    pub(crate) fn calculate_polygon_basis(&self) -> PolygonBasis {
         let plane = self.get_plane();
         let vertices = self.index.get_polygon_vertices(self.poly_id);
         let sum: Vector3<Dec> = vertices.iter().copied().fold(Vector3::zero(), |a, b| a + b);
@@ -268,7 +276,7 @@ impl<'a> PolyRef<'a> {
         }
     }
 
-    fn segments_2d_iter<'s>(
+    pub(crate) fn segments_2d_iter<'s>(
         &'s self,
         basis: &'s PolygonBasis,
     ) -> impl Iterator<Item = Segment2D> + 's
@@ -303,7 +311,7 @@ impl<'a> PolyRef<'a> {
         self.index.vertices.get_point(v)
     }
 
-    pub fn get_segments(&self) -> impl Iterator<Item = SegRef<'a>> + '_ {
+    pub fn get_segments<'b>(&'b self) -> impl Iterator<Item = SegRef<'a>> + 'a {
         self.index
             .polygons
             .get(&self.poly_id)
@@ -325,6 +333,20 @@ impl<'a> PolyRef<'a> {
             .polygon_bounding_boxes
             .get(&self.poly_id)
             .is_some_and(|bb| bb.is_point_inside(point))
+    }
+
+    pub(crate) fn has_chain(&self, chain: &[Seg]) -> bool {
+        let mut segs = self.index.polygons[&self.poly_id].segments.clone();
+        if let Some(ix) = segs.iter().position(|seg| seg == chain.first().unwrap()) {
+            segs.rotate_left(ix);
+            for i in 0..chain.len() {
+                if segs[i] != chain[i] {
+                    return false;
+                }
+            }
+            return true;
+        }
+        false
     }
 }
 
@@ -363,8 +385,14 @@ impl PartialEq for Poly {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
 pub struct PolyId(pub(super) usize);
+
+impl PartialEq<usize> for PolyId {
+    fn eq(&self, other: &usize) -> bool {
+        self.0 == *other
+    }
+}
 
 impl From<usize> for PolyId {
     fn from(value: usize) -> Self {

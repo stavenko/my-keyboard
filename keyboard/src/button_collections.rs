@@ -183,18 +183,3 @@ impl ButtonsCollection {
         Ok(())
     }
 }
-
-/*
-pub trait ButtonsHull {
-    fn columns(&self) -> impl Iterator<Item = ButtonsColumn> + '_;
-
-    fn buttons(&self) -> Box<dyn Iterator<Item = Button> + '_>;
-    fn right_buttons(&self) -> Box<dyn Iterator<Item = Button> + '_>;
-
-    fn left_buttons(&self) -> Box<dyn Iterator<Item = Button> + '_>;
-
-    fn top_buttons(&self) -> Box<dyn Iterator<Item = Button> + '_>;
-
-    fn bottom_buttons(&self) -> Box<dyn Iterator<Item = Button> + '_>;
-}
-*/

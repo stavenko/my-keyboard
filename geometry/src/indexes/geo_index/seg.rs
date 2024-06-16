@@ -1,6 +1,8 @@
 use std::{
+    borrow::Borrow,
     collections::HashMap,
     fmt::{self, Debug},
+    ops::Deref,
 };
 
 use nalgebra::Vector3;
@@ -37,12 +39,13 @@ pub struct Seg {
     pub(super) dir: SegmentDir,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Copy, Clone)]
 pub struct SegRef<'i> {
     pub(super) rib_id: RibId,
     pub(super) dir: SegmentDir,
     pub(super) index: &'i GeoIndex,
 }
+
 impl<'a> fmt::Debug for SegRef<'a> {
     fn fmt(&self, fo: &mut fmt::Formatter<'_>) -> fmt::Result {
         let f = self.from();
@@ -90,6 +93,33 @@ impl<'a> SegRef<'a> {
             rib_id: self.rib_id,
         }
     }
+
+    pub(crate) fn get(
+        &self,
+        b: Dec,
+    ) -> nalgebra::Matrix<
+        Dec,
+        nalgebra::Const<3>,
+        nalgebra::Const<1>,
+        nalgebra::ArrayStorage<Dec, 3, 1>,
+    > {
+        self.from() + self.dir() * b
+    }
+
+    pub(crate) fn flip(self) -> Self {
+        Self {
+            rib_id: self.rib_id,
+            dir: self.dir.flip(),
+            index: self.index,
+        }
+    }
+
+    pub(crate) fn seg(self) -> Seg {
+        Seg {
+            rib_id: self.rib_id,
+            dir: self.dir,
+        }
+    }
 }
 
 impl Default for SegId {
@@ -118,6 +148,13 @@ impl Seg {
         match self.dir {
             SegmentDir::Fow => rib.0,
             SegmentDir::Rev => rib.1,
+        }
+    }
+    pub(crate) fn to_ref<'a>(self, index: &'a GeoIndex) -> SegRef<'a> {
+        SegRef {
+            rib_id: self.rib_id,
+            dir: self.dir,
+            index,
         }
     }
 }

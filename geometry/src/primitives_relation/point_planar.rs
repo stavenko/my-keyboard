@@ -63,7 +63,7 @@ impl Relation<Vector3<Dec>> for Plane {
     type Relate = PointPlanarRelation;
 
     fn relate(&self, to: &Vector3<Dec>) -> Self::Relate {
-        let distance = (self.normal().dot(to) - self.d()).round_dp(NORMAL_DOT_ROUNDING);
+        let distance = (self.normal().dot(to) - self.d()).round_dp(NORMAL_DOT_ROUNDING + 2);
 
         if distance.is_zero() {
             PointPlanarRelation::In
