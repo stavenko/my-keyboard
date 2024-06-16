@@ -15,14 +15,14 @@ use crate::{
         vertex_index::PtId,
     },
     linear::{line::Line, ray::Ray, segment::Segment},
-    planar::{plane::Plane, polygon::Polygon},
+    planar::{plane::Plane},
 };
 
 use super::{
-    linear::{LinearIntersection, LinearRefIntersection, LinearRefRelation, LinearRelation},
+    linear::{LinearRefIntersection, LinearRefRelation},
     linear_point::PointOnLine,
     point_planar::{
-        PointEdgeRelation, PointPlanarRelation, PointPolygonRefRelation, PointPolygonRelation,
+        PointPlanarRelation, PointPolygonRefRelation,
     },
     relation::Relation,
 };

@@ -8,7 +8,6 @@ use crate::{
         vertex_index::PtId,
     },
     linear::{line::Line, ray::Ray, segment::Segment},
-    origin,
 };
 
 use super::relation::Relation;

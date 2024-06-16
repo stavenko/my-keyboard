@@ -1,10 +1,10 @@
 use core::fmt;
 
-use nalgebra::{ComplexField, Matrix2, Vector2, Vector3};
-use num_traits::{Signed, Zero};
+use nalgebra::{Matrix2, Vector2, Vector3};
+use num_traits::{Zero};
 
 use crate::{
-    decimal::{Dec, STABILITY_ROUNDING},
+    decimal::{Dec},
     indexes::geo_index::seg::SegRef,
 };
 

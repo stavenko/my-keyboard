@@ -1,6 +1,6 @@
 use geometry::{
     decimal::Dec,
-    origin::{self, Origin},
+    origin::{Origin},
 };
 
 use crate::{button_collections::ButtonsCollection, buttons_column::ButtonsColumn, Angle};

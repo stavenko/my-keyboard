@@ -1,4 +1,3 @@
-use std::rc::Rc;
 
 use geometry::{
     decimal::Dec,
@@ -7,12 +6,11 @@ use geometry::{
         hyper_line::HyperLine,
         hyper_point::SuperPoint,
         hyper_surface::{
-            primitive_dynamic_surface::PrimitiveSurface, simple_dynamic_surface::SimpleSurface,
+            simple_dynamic_surface::SimpleSurface,
         },
     },
     origin::Origin,
 };
-use itertools::Itertools;
 
 use crate::{buttons_column_builder::ButtonsColumnBuilder, next_and_peek::NextAndPeekBlank};
 

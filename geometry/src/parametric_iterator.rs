@@ -1,6 +1,5 @@
 use std::marker::PhantomData;
 
-use crate::decimal::Dec;
 
 pub struct ParametricIterator<F> {
     segments: usize,

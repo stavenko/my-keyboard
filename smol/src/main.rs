@@ -1,9 +1,7 @@
-#![allow(warnings)]
-
 use nalgebra::Vector3;
 use num_traits::{One, Zero};
 use rust_decimal_macros::dec;
-use std::{borrow::Cow, collections::HashSet, fs::OpenOptions};
+use std::{borrow::Cow, fs::OpenOptions};
 
 use clap::Parser;
 
@@ -18,7 +16,6 @@ use geometry::{
     },
     indexes::geo_index::{
         index::GeoIndex,
-        mesh::{self, MeshRefMut},
     },
     origin::Origin,
     shapes,

@@ -1,4 +1,3 @@
-use std::rc::Rc;
 
 use geometry::{
     decimal::Dec,
@@ -10,7 +9,6 @@ use geometry::{
         hyper_surface::{
             dynamic_surface::DynamicSurface, primitive_dynamic_surface::PrimitiveSurface,
         },
-        shifted_hyper_path::ShiftedSideHyperPath,
     },
     indexes::geo_index::index::GeoIndex,
 };

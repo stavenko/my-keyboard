@@ -1,7 +1,7 @@
 use geometry::{
     decimal::Dec,
     hyper_path::{
-        hyper_path::{HyperPath, Root},
+        hyper_path::{Root},
         hyper_point::SuperPoint,
     },
 };

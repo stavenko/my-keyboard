@@ -33,8 +33,8 @@ use crate::{
     reversable::Reversable,
 };
 
-use super::line::{Line, LineId, LineRef};
-use super::poly::{PolygonSplitMeta, Side};
+use super::line::{Line, LineId};
+use super::poly::{PolygonSplitMeta};
 use super::rib::RibRef;
 use super::tri_iter::TriIter;
 use super::{
@@ -3423,12 +3423,12 @@ pub enum PolygonRelation {
 }
 #[cfg(test)]
 mod tests {
-    use nalgebra::Vector3;
-    use rust_decimal_macros::dec;
+    
+    
 
-    use crate::decimal::Dec;
+    
 
-    use super::GeoIndex;
+    
 
     #[test]
     fn real_world_problem() {

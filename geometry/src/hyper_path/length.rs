@@ -2,7 +2,6 @@ use std::ops::Neg;
 
 use nalgebra::{Dim, Matrix, Storage};
 
-use crate::decimal::Dec;
 
 pub trait Length {
     type Scalar;

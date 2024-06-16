@@ -1,5 +1,4 @@
-use itertools::Itertools;
-use nalgebra::{Vector, Vector3};
+use nalgebra::{Vector3};
 use num_traits::{Signed, Zero};
 
 use crate::{

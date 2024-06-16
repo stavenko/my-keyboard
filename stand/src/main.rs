@@ -1,12 +1,11 @@
 use nalgebra::Vector3;
 use num_traits::{One, Zero};
 use rust_decimal_macros::dec;
-use std::{borrow::Cow, collections::HashSet, fs::OpenOptions};
+use std::{fs::OpenOptions};
 
 use clap::Parser;
 
 use geometry::{
-    basis::Basis,
     decimal::Dec,
     hyper_path::{
         hyper_line::HyperLine,
@@ -14,9 +13,7 @@ use geometry::{
         hyper_point::SuperPoint,
         split_hyper_line::SplitHyperLine,
     },
-    indexes::geo_index::{index::GeoIndex, mesh},
-    origin::Origin,
-    shapes,
+    indexes::geo_index::{index::GeoIndex},
 };
 use keyboard::{Angle, Button, ButtonsCollection, ButtonsColumn, RightKeyboardConfig};
 
@@ -220,7 +217,7 @@ fn main() -> Result<(), anyhow::Error> {
         )
         .build();
 
-    let mut index = GeoIndex::new();
+    let index = GeoIndex::new();
 
     #[rustfmt::skip]
     let p1: &[Vector3<Dec>] = &[

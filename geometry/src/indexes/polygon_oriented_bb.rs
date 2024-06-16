@@ -3,7 +3,7 @@ use num_traits::Bounded;
 
 use crate::{
     decimal::Dec,
-    polygon_basis::{self, PolygonBasis},
+    polygon_basis::{PolygonBasis},
 };
 
 use super::geo_index::poly::PolyRef;

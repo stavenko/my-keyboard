@@ -1,4 +1,4 @@
-use std::{ops::Div, rc::Rc};
+use std::{ops::Div};
 
 use nalgebra::Vector3;
 use num_traits::{One, Zero};
@@ -7,7 +7,6 @@ use crate::{
     decimal::Dec,
     geometry::Geometry,
     hyper_path::{hyper_path::IsLinear, line::GetT},
-    indexes::geo_index::poly::{Poly, PolyId},
     parametric_iterator::ParametricIterator,
 };
 

@@ -5,12 +5,10 @@ use geometry::{
         hyper_line::HyperLine,
         hyper_path::{HyperPath, Root},
         hyper_point::SuperPoint,
-        hyper_surface::{dynamic_surface::DynamicSurface, simple_dynamic_surface::SimpleSurface},
+        hyper_surface::{dynamic_surface::DynamicSurface},
     },
     indexes::geo_index::index::GeoIndex,
-    origin::Origin,
 };
-use itertools::Itertools;
 
 use crate::{
     button::Button, button_collection_builder::ButtonsCollectionBuilder,

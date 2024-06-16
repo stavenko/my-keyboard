@@ -2,7 +2,6 @@ use std::{
     fmt::{Debug, Display},
     marker::PhantomData,
     ops::{Add, Div, Mul},
-    rc::Rc,
 };
 
 use nalgebra::Vector3;

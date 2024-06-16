@@ -1,10 +1,10 @@
-use core::fmt::{self, Debug, Display};
+use core::fmt::{Debug, Display};
 use std::{
     marker::PhantomData,
     ops::{Div, Mul, Sub},
 };
 
-use nalgebra::{Scalar, Vector3};
+use nalgebra::{Vector3};
 use num_traits::{One, Pow, Zero};
 
 use super::{

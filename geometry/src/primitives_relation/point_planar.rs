@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use nalgebra::Vector3;
 use num_traits::{Signed, Zero};
 use rust_decimal_macros::dec;
@@ -367,14 +366,10 @@ impl<'a> Relation<Vector3<Dec>> for PolyRef<'a> {
 }
 #[cfg(test)]
 mod tests {
-    use nalgebra::Vector3;
-    use rust_decimal_macros::dec;
+    
+    
 
-    use crate::{
-        linear::ray::Ray,
-        planar::polygon::Polygon,
-        primitives_relation::{linear_planar::LinearPolygonRelation, relation::Relation},
-    };
+    
 
     /*
     #[test]

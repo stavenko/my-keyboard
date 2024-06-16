@@ -6,7 +6,7 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
-use nalgebra::{RealField, Scalar, Vector3};
+use nalgebra::{Vector3};
 use num_traits::{One, Pow, Zero};
 
 use crate::{

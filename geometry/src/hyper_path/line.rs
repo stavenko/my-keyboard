@@ -1,5 +1,5 @@
 use std::fmt;
-use std::ops::{Add, Mul, Sub};
+use std::ops::{Mul, Sub};
 
 use itertools::Itertools;
 use num_traits::{One, Pow, Zero};

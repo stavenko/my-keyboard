@@ -1,18 +1,15 @@
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashSet, VecDeque},
     ops::Deref,
 };
 
 use itertools::Itertools;
 use nalgebra::Vector3;
-use num_traits::Signed;
 use stl_io::Triangle;
 use tap::TapFallible;
 
 use crate::{
     decimal::Dec,
-    indexes::{geo_index::poly::Side, vertex_index::PtId},
-    planar::polygon::Polygon,
 };
 
 use super::{
