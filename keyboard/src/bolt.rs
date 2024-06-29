@@ -1,47 +1,40 @@
-use std::borrow::Cow;
-
 use geometry::{
-    basis::Basis,
     decimal::Dec,
     indexes::geo_index::{index::GeoIndex, mesh::MeshId},
     origin::Origin,
     shapes,
 };
+use rust_decimal_macros::dec;
 
+use crate::bolt_builder::BoltBuilder;
+
+#[derive(Clone)]
 pub struct Bolt {
-    origin: Origin,
-    head_diameter: Dec,
-    diameter: Dec,
-    head_cylinder_height: Dec,
+    pub(crate) head_diameter: Dec,
+    pub(crate) diameter: Dec,
+    pub(crate) head_height: Dec,
     /// Height of whole bolt without head
-    height: Dec,
-    nut: Option<Nut>,
+    pub(crate) height: Dec,
+    pub(crate) nut: Option<Nut>,
 }
 
+impl Bolt {
+    pub fn new() -> BoltBuilder {
+        BoltBuilder::default()
+    }
+}
+
+#[derive(Clone)]
 pub enum Nut {
     Hex { outer_diameter: Dec, height: Dec },
 }
 
-impl Bolt {
-    pub fn render_on_thread_part(
-        &self,
-        index: &mut GeoIndex,
-        mesh_id: MeshId,
-    ) -> anyhow::Result<()> {
-        let b = Basis::new(
-            self.origin.x(),
-            self.origin.y(),
-            self.origin.z(),
-            self.origin.center,
-        )
-        .unwrap();
-        let cyl = shapes::cylinder(b, self.height, self.diameter / 2, 10);
-
-        index.save_mesh(cyl.into_iter().map(Cow::Owned));
-        Ok(())
-    }
-
-    pub fn render_on_head_part(&self, index: &mut GeoIndex, mesh_id: MeshId) -> anyhow::Result<()> {
-        Ok(())
+impl Nut {
+    pub fn m2_hex() -> Self {
+        let outer_diameter = dec!(4) / dec!(3) * dec!(4);
+        Self::Hex {
+            outer_diameter: outer_diameter.into(),
+            height: Dec::from(1),
+        }
     }
 }

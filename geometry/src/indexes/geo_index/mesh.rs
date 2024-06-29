@@ -52,7 +52,7 @@ impl<'a> MeshRef<'a> {
     pub(crate) fn get_mesh_polygons_for_rib(&self, rib: RibId) -> Vec<PolyId> {
         let mesh_polygons = self
             .geo_index
-            .get_mesh_polygon_ids(&self.mesh_id)
+            .get_mesh_polygon_ids(self.mesh_id)
             .collect::<HashSet<_>>();
 
         let rib_polygons = self

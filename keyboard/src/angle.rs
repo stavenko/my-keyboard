@@ -26,8 +26,8 @@ impl Zero for Angle {
 }
 
 impl Angle {
-    pub fn from_deg(deg: Dec) -> Self {
-        Self(deg * Dec::from(Decimal::PI) / Dec::from(180))
+    pub fn from_deg(deg: impl Into<Dec>) -> Self {
+        Self(deg.into() * Dec::from(Decimal::PI) / Dec::from(180))
     }
 
     pub fn deg(&self) -> Dec {

@@ -13,8 +13,14 @@ pub struct VertexIndex {
 
 pub const MAX_DIGITS: usize = 6;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct PtId(usize);
+
+impl PartialEq<usize> for PtId {
+    fn eq(&self, other: &usize) -> bool {
+        self.0 == *other
+    }
+}
 
 impl VertexIndex {
     fn vertex(mut v: Vector3<Dec>, quantification: usize) -> Vector3<Dec> {

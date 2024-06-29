@@ -27,20 +27,23 @@ impl Origin {
         let v = v - self.center;
         self.center + self.x() * v.dot(&self.x()) + self.y() * v.dot(&self.y())
     }
+
     pub fn project_unit(&self, v: Vector3<Dec>) -> Vector3<Dec> {
         (self.x() * v.dot(&self.x()) + self.y() * v.dot(&self.y())).normalize()
     }
 
-    pub fn offset_z(mut self, amount: Dec) -> Self {
-        self.center = self.z() * amount + self.center;
+    pub fn offset_z(mut self, amount: impl Into<Dec>) -> Self {
+        self.center = self.z() * amount.into() + self.center;
         self
     }
-    pub fn offset_x(mut self, amount: Dec) -> Self {
-        self.center = self.x() * amount + self.center;
+
+    pub fn offset_x(mut self, amount: impl Into<Dec>) -> Self {
+        self.center = self.x() * amount.into() + self.center;
         self
     }
-    pub fn offset_y(mut self, amount: Dec) -> Self {
-        self.center = self.y() * amount + self.center;
+
+    pub fn offset_y(mut self, amount: impl Into<Dec>) -> Self {
+        self.center = self.y() * amount.into() + self.center;
         self
     }
 
@@ -75,6 +78,7 @@ impl Origin {
     pub fn x(&self) -> Vector3<Dec> {
         self.rotation * Vector3::x()
     }
+
     pub fn y(&self) -> Vector3<Dec> {
         self.rotation * Vector3::y()
     }
@@ -89,12 +93,6 @@ impl Origin {
     }
 
     pub fn apply(&mut self, origin: &Origin) {
-        //---
-
-        //let m = self.get_matrix();
-        //let om = origin.get_matrix();
-        //let mm = m * om;
-        // ---
         self.center = origin.rotation * (self.center) + origin.center;
         self.rotation = origin.rotation * self.rotation;
     }

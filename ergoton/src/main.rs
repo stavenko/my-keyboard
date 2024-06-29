@@ -318,6 +318,7 @@ fn main() -> Result<(), anyhow::Error> {
         )
         .build();
 
+    /*
     let mut index = GeoIndex::new();
 
     keyboard.buttons(&mut index).unwrap();
@@ -336,6 +337,7 @@ fn main() -> Result<(), anyhow::Error> {
         .open(cli.output_path)?;
 
     stl_io::write_stl(&mut writer, index.into_iter())?;
+    */
 
     Ok(())
 }

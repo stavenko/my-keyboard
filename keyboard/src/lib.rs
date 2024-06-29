@@ -1,6 +1,7 @@
 mod angle;
 mod bolt;
 mod bolt_builder;
+mod bolt_point;
 mod button;
 mod button_builder;
 mod button_collection_builder;
@@ -13,6 +14,8 @@ mod next_and_peek;
 mod with_next;
 
 pub use angle::Angle;
+pub use bolt::Bolt;
+pub use bolt_point::BoltPoint;
 pub use button::Button;
 pub use button::ButtonMountKind;
 pub use button_builder::ButtonBuilder;

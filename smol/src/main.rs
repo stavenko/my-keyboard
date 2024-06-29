@@ -1,7 +1,7 @@
 use nalgebra::Vector3;
 use num_traits::{One, Zero};
 use rust_decimal_macros::dec;
-use std::{borrow::Cow, fs::OpenOptions};
+use std::fs::OpenOptions;
 
 use clap::Parser;
 
@@ -14,30 +14,70 @@ use geometry::{
         hyper_point::SuperPoint,
         split_hyper_line::SplitHyperLine,
     },
-    indexes::geo_index::{
-        index::GeoIndex,
-    },
+    indexes::geo_index::index::GeoIndex,
     origin::Origin,
-    shapes,
 };
-use keyboard::{Angle, Button, ButtonsCollection, ButtonsColumn, RightKeyboardConfig};
+use keyboard::{
+    Angle, Bolt, BoltPoint, Button, ButtonsCollection, ButtonsColumn, RightKeyboardConfig,
+};
 
 mod cli;
 
 fn main() -> Result<(), anyhow::Error> {
     let cli = cli::Command::parse();
 
-    /*
-    let _m2_10 = Bolt {
-        nut: Some(keyboard::bolt_builder::Nut::hex_with_inner_diameter(4.0)),
-        diameter: 2.0,
-        height: 10.0,
-        head_diameter: 4.0,
-        head_height: 1.0,
-    };
-    */
+    let m2_10 = Bolt::new()
+        .m2()
+        .head_height(Dec::from(2))
+        .head_diameter(Dec::from(4))
+        .height(Dec::from(10))
+        .build();
 
     let keyboard = RightKeyboardConfig::build()
+        .add_bolt(
+            BoltPoint::new(m2_10.clone())
+                .head_up_extension(10)
+                .thread_material_gap(dec!(0.5))
+                .radial_head_extension(dec!(0.7))
+                .origin(
+                    Origin::new()
+                        .offset_x(-15)
+                        .offset_y(dec!(3))
+                        .offset_z(dec!(15))
+                        .rotate_axisangle(
+                            Vector3::new(Dec::one(), Dec::one(), Dec::zero()).normalize()
+                                * Angle::from_deg(-75).rad(),
+                        )
+                        .rotate_axisangle(Vector3::x() * Angle::from_deg(30).rad())
+                        .offset_z(-5),
+                ),
+        )
+        .add_bolt(
+            BoltPoint::new(m2_10.clone())
+                .head_up_extension(10)
+                .thread_material_gap(dec!(0.5))
+                .radial_head_extension(dec!(0.7))
+                .origin(
+                    Origin::new()
+                        .offset_x(15)
+                        .offset_y(-dec!(11.5))
+                        .offset_z(dec!(0.4))
+                        .rotate_axisangle(Vector3::x() * Angle::from_deg(10).rad()),
+                ),
+        )
+        .add_bolt(
+            BoltPoint::new(m2_10.clone())
+                .head_up_extension(10)
+                .thread_material_gap(dec!(0.5))
+                .radial_head_extension(dec!(0.7))
+                .origin(
+                    Origin::new()
+                        .offset_x(15)
+                        .offset_y(dec!(11.5))
+                        .offset_z(dec!(0.4))
+                        .rotate_axisangle(Vector3::x() * Angle::from_deg(-10).rad()),
+                ),
+        )
         .main(
             ButtonsCollection::build()
                 .column(
@@ -224,17 +264,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     let mut index = GeoIndex::new();
 
-    keyboard.inner_wall_surface(&mut index).unwrap();
-
-    keyboard.outer_wall_surface(&mut index).unwrap();
-
-    keyboard.buttons(&mut index).unwrap();
-
-    keyboard.fill_between_buttons(&mut index).unwrap();
-
-    keyboard
-        .inner_outer_surface_table_connection(&mut index)
-        .unwrap();
+    keyboard.buttons_hull(&mut index).unwrap();
 
     let o = Origin::new()
         .offset_x(Dec::from(20))
@@ -244,38 +274,6 @@ fn main() -> Result<(), anyhow::Error> {
     let o = o.rotate_axisangle(x * Dec::from(14));
 
     let b = Basis::new(o.x(), o.y(), o.z(), o.center).unwrap();
-
-    let mm = index.get_current_default_mesh();
-
-    let mesh_id = index.save_mesh(
-        shapes::cylinder(b, Dec::from(15), Dec::from(2), 10)
-            .into_iter()
-            .take(10)
-            .map(Cow::Owned),
-    );
-
-    {
-        let mutm = index.get_mutable_mesh(mm);
-        if let Err(e) = mutm.boolean_diff(mesh_id) {
-            dbg!("~~~~", e);
-        }
-    }
-
-    //index.flip_intersected_polygons();
-    /*
-
-    // index.create_default_mesh();
-
-    */
-    //index.flip_polygons_with_common_ribs();
-
-    //let mut k = index.get_mutable_mesh(mm);
-    //k.remove();
-
-    /*
-     */
-    //let m = index.get_mesh(mm);
-    //
 
     let mut writer = OpenOptions::new()
         .write(true)

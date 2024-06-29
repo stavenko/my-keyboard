@@ -176,13 +176,17 @@ impl<'a> PolyRef<'a> {
             .collect();
 
         let c_len = contour.len();
+
         if c_len == 3 {
             dbg!(self.poly_id);
         }
+
         let contours = vec![contour];
+
         let mut t = cdt::Triangulation::new_from_contours(&tup_array, &contours).tap_err(|e| {
             panic!("{}", e);
         })?;
+
         while !t.done() {
             t.step().tap_err(|e| {
                 dbg!(self.poly_id);
@@ -211,6 +215,7 @@ impl<'a> PolyRef<'a> {
             .map(|a| Vector2::new(tup_array[a].0.into(), tup_array[a].1.into()))
             .collect();
 
+        /*
         if c_len > 14 {
             dbg!(&basis);
             println!(
@@ -220,6 +225,7 @@ impl<'a> PolyRef<'a> {
                 self.svg_debug(res),
             );
         }
+        */
 
         let result = t
             .triangles()
@@ -360,7 +366,7 @@ impl PartialEq for Poly {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
-pub struct PolyId(pub(super) usize);
+pub struct PolyId(pub usize);
 
 impl PartialEq<usize> for PolyId {
     fn eq(&self, other: &usize) -> bool {
