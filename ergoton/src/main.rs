@@ -1,9 +1,9 @@
-use nalgebra::Vector3;
-use num_traits::{One, Zero};
-use rust_decimal_macros::dec;
 use std::fs::OpenOptions;
 
 use clap::Parser;
+use nalgebra::Vector3;
+use num_traits::{One, Zero};
+use rust_decimal_macros::dec;
 
 use geometry::{
     decimal::Dec,
@@ -13,7 +13,7 @@ use geometry::{
         hyper_point::SuperPoint,
         split_hyper_line::SplitHyperLine,
     },
-    indexes::geo_index::index::GeoIndex,
+    indexes::{aabb::Aabb, geo_index::index::GeoIndex},
 };
 use keyboard::{Angle, Button, ButtonsCollection, ButtonsColumn, RightKeyboardConfig};
 
@@ -318,17 +318,11 @@ fn main() -> Result<(), anyhow::Error> {
         )
         .build();
 
-    /*
-    let mut index = GeoIndex::new();
-
-    keyboard.buttons(&mut index).unwrap();
-    keyboard.inner_wall_surface(&mut index).unwrap();
-    keyboard.outer_wall_surface(&mut index).unwrap();
-    println!("Now filling");
-    keyboard.fill_between_buttons(&mut index).unwrap();
-    keyboard
-        .inner_outer_surface_table_connection(&mut index)
-        .unwrap();
+    let mut index = GeoIndex::new(Aabb::from_points(&[
+        Vector3::new(Dec::from(-50), Dec::from(-50), Dec::from(-50)),
+        Vector3::new(Dec::from(50), Dec::from(50), Dec::from(50)),
+    ]));
+    keyboard.buttons_hull(&mut index).unwrap();
 
     let mut writer = OpenOptions::new()
         .write(true)
@@ -337,7 +331,6 @@ fn main() -> Result<(), anyhow::Error> {
         .open(cli.output_path)?;
 
     stl_io::write_stl(&mut writer, index.into_iter())?;
-    */
 
     Ok(())
 }

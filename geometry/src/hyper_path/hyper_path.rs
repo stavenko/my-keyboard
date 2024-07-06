@@ -117,15 +117,15 @@ where
         let half = <T as Tensor>::Scalar::one() / <T as Tensor>::Scalar::from(2);
         for cur in 0..l {
             let next = cur + 1;
-            let f = *(&mut self.items[cur]).0.last().expect("ok");
-            let l = *(&mut self.items[next]).0.first().expect("ok");
+            let f = *self.items[cur].0.last().expect("ok");
+            let l = *self.items[next].0.first().expect("ok");
             let d = l - f;
             let d = d * half;
             let m = d + f;
-            if let Some(last) = (&mut self.items[cur]).0.last_mut() {
+            if let Some(last) = self.items[cur].0.last_mut() {
                 *last = m;
             }
-            if let Some(first) = (&mut self.items[next]).0.first_mut() {
+            if let Some(first) = self.items[next].0.first_mut() {
                 *first = m;
             }
         }
@@ -136,15 +136,15 @@ where
         let half = <T as Tensor>::Scalar::one() / <T as Tensor>::Scalar::from(2);
         for cur in 0..l {
             let next = (cur + 1) % l;
-            let f = *(&mut self.items[cur]).0.last().expect("ok");
-            let l = *(&mut self.items[next]).0.first().expect("ok");
+            let f = *self.items[cur].0.last().expect("ok");
+            let l = *self.items[next].0.first().expect("ok");
             let d = l - f;
             let d = d * half;
             let m = d + f;
-            if let Some(last) = (&mut self.items[cur]).0.last_mut() {
+            if let Some(last) = self.items[cur].0.last_mut() {
                 *last = m;
             }
-            if let Some(first) = (&mut self.items[next]).0.first_mut() {
+            if let Some(first) = self.items[next].0.first_mut() {
                 *first = m;
             }
         }

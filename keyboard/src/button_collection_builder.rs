@@ -1,7 +1,4 @@
-use geometry::{
-    decimal::Dec,
-    origin::{Origin},
-};
+use geometry::{decimal::Dec, origin::Origin};
 
 use crate::{button_collections::ButtonsCollection, buttons_column::ButtonsColumn, Angle};
 
@@ -50,13 +47,13 @@ impl ButtonsCollectionBuilder {
         self
     }
 
-    pub fn padding(mut self, padding: Dec) -> Self {
-        self.padding = padding;
+    pub fn padding(mut self, padding: impl Into<Dec>) -> Self {
+        self.padding = padding.into();
         self
     }
 
-    pub fn height(mut self, height: Dec) -> Self {
-        self.height = height;
+    pub fn height(mut self, height: impl Into<Dec>) -> Self {
+        self.height = height.into();
         self
     }
 

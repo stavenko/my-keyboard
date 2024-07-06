@@ -1,9 +1,4 @@
-use geometry::{
-    decimal::Dec,
-    indexes::geo_index::{index::GeoIndex, mesh::MeshId},
-    origin::Origin,
-    shapes,
-};
+use geometry::decimal::Dec;
 use rust_decimal_macros::dec;
 
 use crate::bolt_builder::BoltBuilder;
@@ -19,7 +14,7 @@ pub struct Bolt {
 }
 
 impl Bolt {
-    pub fn new() -> BoltBuilder {
+    pub fn build() -> BoltBuilder {
         BoltBuilder::default()
     }
 }

@@ -1,5 +1,5 @@
-use nalgebra::Vector3;
-use num_traits::Bounded;
+use nalgebra::{ComplexField, Vector3};
+use num_traits::{Bounded, Pow, Zero};
 use rust_decimal_macros::dec;
 
 use crate::{decimal::Dec, primitives_relation::relation::Relation};
@@ -16,6 +16,54 @@ pub struct Aabb {
 }
 
 impl Aabb {
+    pub fn split_x(&self) -> [Self; 2] {
+        let middle = self.min.lerp(&self.max, dec!(0.5).into());
+
+        [
+            Aabb::from_points(&[self.min, Vector3::new(middle.x, self.max.y, self.max.z)]),
+            Aabb::from_points(&[self.max, Vector3::new(middle.x, self.min.y, self.min.z)]),
+        ]
+    }
+
+    pub fn split_y(&self) -> [Self; 2] {
+        let middle = self.min.lerp(&self.max, dec!(0.5).into());
+
+        [
+            Aabb::from_points(&[self.min, Vector3::new(self.max.x, middle.y, self.max.z)]),
+            Aabb::from_points(&[self.max, Vector3::new(self.min.x, middle.y, self.min.z)]),
+        ]
+    }
+    pub fn split_z(&self) -> [Self; 2] {
+        let middle = self.min.lerp(&self.max, dec!(0.5).into());
+
+        [
+            Aabb::from_points(&[self.min, Vector3::new(self.max.x, self.max.y, middle.z)]),
+            Aabb::from_points(&[self.max, Vector3::new(self.min.x, self.min.y, middle.z)]),
+        ]
+    }
+
+    pub fn split_by_octs(&self) -> [Self; 8] {
+        let x = self.split_x();
+        let [ny, py] = x.map(|x| x.split_y());
+        let [[[nxnynz, nxnypz], [nxpynz, nxpypz]], [[pxnynz, pxnypz], [pxpynz, pxpypz]]] =
+            [ny.map(|y| y.split_z()), py.map(|y| y.split_z())];
+
+        [
+            nxnynz, nxnypz, nxpynz, nxpypz, pxnynz, pxnypz, pxpynz, pxpypz,
+        ]
+        //     x   y   z
+        //result[0 + 0 + 0] = nxnynz;
+        //result[0 + 0 + 1] = nxnypz;
+
+        //result[0 + 2 + 0] = nxpynz;
+        //result[0 + 2 + 1] = nxpypz;
+
+        //result[4 + 0 + 0] = pxnynz;
+        //result[4 + 0 + 1] = pxnypz;
+
+        //result[4 + 2 + 0] = pxpynz;
+        //result[4 + 2 + 1] = pxpypz;
+    }
     pub fn from_points(points: &[Vector3<Dec>]) -> Self {
         let mut min: Vector3<Dec> = Vector3::new(
             Bounded::max_value(),
@@ -42,6 +90,11 @@ impl Aabb {
 
         Aabb { min, max }
     }
+    pub fn add(&mut self, pt: Vector3<Dec>) {
+        self.min.x = self.min.x.min(pt.x);
+        self.min.y = self.min.y.min(pt.y);
+        self.min.z = self.min.x.min(pt.z);
+    }
 
     #[allow(unused)]
     pub(crate) fn merge(mut self, aabb: Aabb) -> Aabb {
@@ -60,16 +113,63 @@ impl Aabb {
 impl Relation<Sphere> for Aabb {
     type Relate = BoundRelation;
 
-    fn relate(&self, _to: &Sphere) -> Self::Relate {
-        todo!("implement aabb <> sphere");
+    fn relate(&self, sphere: &Sphere) -> Self::Relate {
+        let center = [sphere.center.x, sphere.center.y, sphere.center.z];
+        let min_b = [self.min.x, self.min.y, self.min.z];
+        let max_b = [self.max.x, self.max.y, self.max.z];
+
+        for i in 0..3 {
+            //println!("c: {},    {}     {}", center[i], min_b[i], max_b[i]);
+        }
+
+        let min_dist: Dec = center
+            .iter()
+            .zip(min_b)
+            .map(|(&c, m)| {
+                if c < m {
+                    (c - m).pow(2i64)
+                } else {
+                    Dec::zero()
+                }
+            })
+            .sum();
+
+        let max_dist: Dec = center
+            .iter()
+            .zip(max_b)
+            .map(|(&c, m)| {
+                if c > m {
+                    (c - m).pow(2i64)
+                } else {
+                    Dec::zero()
+                }
+            })
+            .sum();
+
+        //dbg!(max_dist, min_dist, sphere.radius);
+        if (max_dist + min_dist) < sphere.radius.pow(2i64) {
+            BoundRelation::Intersects
+        } else {
+            BoundRelation::Unrelated
+        }
     }
 }
 
 impl<T: Clone> Relation<Node<T>> for Aabb {
     type Relate = BoundNodeRelation;
 
-    fn relate(&self, _to: &Node<T>) -> Self::Relate {
-        todo!("implement aabb <> node");
+    fn relate(&self, to: &Node<T>) -> Self::Relate {
+        if to.point.x >= self.min.x
+            && to.point.x <= self.max.x
+            && to.point.y >= self.min.y
+            && to.point.y <= self.max.y
+            && to.point.z >= self.min.z
+            && to.point.z <= self.max.z
+        {
+            BoundNodeRelation::Inside
+        } else {
+            BoundNodeRelation::Outside
+        }
     }
 }
 

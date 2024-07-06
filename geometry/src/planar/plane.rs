@@ -1,4 +1,4 @@
-use std::{fmt, thread::panicking};
+use std::fmt;
 
 use nalgebra::{ComplexField, Vector3};
 use num_traits::{One, Signed, Zero};

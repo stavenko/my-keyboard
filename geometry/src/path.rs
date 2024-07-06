@@ -6,7 +6,6 @@ use self::segment::EdgeSegment;
 use super::decimal::Dec;
 
 pub mod bezier;
-// pub mod polypath;
 pub mod segment;
 
 #[derive(Clone, Debug)]

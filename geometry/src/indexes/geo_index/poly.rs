@@ -175,12 +175,6 @@ impl<'a> PolyRef<'a> {
             .map(|v| (v.x.round_dp(9).into(), v.y.round_dp(9).into()))
             .collect();
 
-        let c_len = contour.len();
-
-        if c_len == 3 {
-            dbg!(self.poly_id);
-        }
-
         let contours = vec![contour];
 
         let mut t = cdt::Triangulation::new_from_contours(&tup_array, &contours).tap_err(|e| {
@@ -189,43 +183,41 @@ impl<'a> PolyRef<'a> {
 
         while !t.done() {
             t.step().tap_err(|e| {
-                dbg!(self.poly_id);
                 let vertices = self
                     .segments_2d_iter(&basis)
                     .map(|s| s.from * Dec::from(10))
                     .collect_vec();
                 let svg = self.svg_debug(vertices);
-                let pts = self.points();
-                for pt in &pts {
-                    let v = self.index.vertices.get_point(*pt);
-                    println!("{}, {}, {}", v.x, v.y, v.z);
-                }
-                let vvvs: Vec<_> = index.iter().map(|v| (v.x, v.y)).collect();
-                for (x, y) in vvvs {
-                    println!("{}, {}", x, y);
-                }
 
-                panic!("~~~\n\n{svg}+++++\n\n{pts:?}\n\n{e}");
+                /*
+                if let Some((parent_id, parent_segments)) = self
+                    .index
+                    .polygon_parent
+                    .get(&self.poly_id)
+                    .and_then(|p| self.index.deleted_polygons.get(p).map(|ps| (p, ps)))
+                {
+                    let vertices = parent_segments
+                        .segments
+                        .iter()
+                        .map(|s| Segment2D {
+                            from: basis.project_on_plane_z(
+                                &self.index.vertices.get_point(s.from(&self.index.ribs)),
+                            ),
+                            to: basis.project_on_plane_z(
+                                &self.index.vertices.get_point(s.to(&self.index.ribs)),
+                            ),
+                        })
+                        .map(|s| s.from * Dec::from(10))
+                        .collect_vec();
+                    let svg = self.svg_debug(vertices);
+                    print!("PARENT {parent_id:?}: \n\n{svg}\n\n");
+                }
+                */
+
+                println!("\n\n{svg}\n\n{:?}~~~", self.poly_id);
+                panic!("{e}");
             })?;
         }
-
-        let res: Vec<Vector2<Dec>> = t
-            .triangles()
-            .flat_map(|(a, b, c)| [a, b, c])
-            .map(|a| Vector2::new(tup_array[a].0.into(), tup_array[a].1.into()))
-            .collect();
-
-        /*
-        if c_len > 14 {
-            dbg!(&basis);
-            println!(
-                "--------------------SVG------------------\n{}\n{}\n{}\n\n~~~~~~~~~~~~~",
-                self.svg_debug(dbg_2d_poly1),
-                self.svg_debug(dbg_2d_poly2),
-                self.svg_debug(res),
-            );
-        }
-        */
 
         let result = t
             .triangles()

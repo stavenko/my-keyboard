@@ -186,7 +186,6 @@ impl<'a> Relation<SegRef<'a>> for Line {
                 } else if y.is_one() {
                     LinearRefRelation::Intersect(LinearRefIntersection::One)
                 } else {
-                    println!("{}", (st.y / to.dir().magnitude()));
                     LinearRefRelation::Intersect(LinearRefIntersection::In(st.x, st.y))
                 }
             } else {

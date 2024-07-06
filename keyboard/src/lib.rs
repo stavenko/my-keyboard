@@ -11,7 +11,6 @@ mod buttons_column_builder;
 mod keyboard_builder;
 mod keyboard_config;
 mod next_and_peek;
-mod with_next;
 
 pub use angle::Angle;
 pub use bolt::Bolt;

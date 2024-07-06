@@ -49,6 +49,7 @@ impl<'a> RibRef<'a> {
         rib.0 == pt_id || rib.1 == pt_id
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub(crate) fn from_pt(&self) -> PtId {
         self.index.ribs[&self.rib_id].0
     }

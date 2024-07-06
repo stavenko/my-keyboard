@@ -6,6 +6,6 @@ use crate::decimal::Dec;
 #[allow(dead_code)]
 
 pub struct Sphere {
-    center: Vector3<Dec>,
-    radius: Dec,
+    pub center: Vector3<Dec>,
+    pub radius: Dec,
 }

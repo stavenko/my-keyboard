@@ -1,7 +1,10 @@
-<svg viewBox="-30 -5 150 10" xmlns="http://www.w3.org/2000/svg" width="" height="400">
-<circle cx="-17.798551278" cy="0.272711865" r="0.16" fill="red"/>
-<circle cx="-17.748944305" cy="2.356331599" r="0.16" fill="green"/>
-<circle cx="81.223009810" cy="0.000000000" r="0.16" fill="blue"/>
-<path stroke="green" stroke-width="0.06" d = "M -17.798551278 0.272711865 L -17.748944305 2.356331599 L 81.223009810 0.000000000 L -22.797134819 0.391718511 L -22.878379407 -3.020761975 z" />
+<svg viewBox="-40 -1 80 2" xmlns="http://www.w3.org/2000/svg" width="" height="400">
+<circle cx="39.115517592" cy="0.000000000" r="0.08" fill="red"/>
+<circle cx="-38.985383944" cy="0.499178469" r="0.08" fill="green"/>
+<circle cx="-38.991775270" cy="-0.500801106" r="0.08" fill="blue"/>
+<circle cx="38.861641622" cy="0.001622637" r="0.08" fill="blue"/>
+ 
+<path stroke="green" stroke-width="0.06" d = "M 39.115517592 0.000000000 L -38.985383944 0.499178469 L -38.991775270 -0.500801106 L 38.861641622 0.001622637 z" />
+
 </svg>
 

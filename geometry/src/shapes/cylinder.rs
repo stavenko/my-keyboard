@@ -2,15 +2,11 @@ use nalgebra::{ComplexField, Vector3};
 use num_traits::Zero;
 use rust_decimal::Decimal;
 
-use crate::{
-    basis::Basis,
-    decimal::Dec,
-    origin::{self, Origin},
-};
+use crate::{decimal::Dec, origin::Origin};
 
 pub struct Cylinder {
     top_basis: Origin,
-    bottom_basis: Origin,
+    //bottom_basis: Origin,
     steps: usize,
     top_cap: bool,
     bottom_cap: bool,
@@ -21,11 +17,10 @@ pub struct Cylinder {
 impl Cylinder {
     pub fn centered(origin: Origin, height: Dec, radius: Dec) -> Self {
         let top_basis = origin.clone().offset_z(height / 2);
-        let bottom_basis = origin.offset_z(-height / 2);
 
         Self {
             top_basis,
-            bottom_basis,
+            //bottom_basis,
             steps: 10,
             top_cap: true,
             bottom_cap: true,
@@ -49,13 +44,18 @@ impl Cylinder {
         self
     }
 
+    pub fn steps(mut self, steps: usize) -> Self {
+        self.steps = steps;
+        self
+    }
+
     pub fn with_top_at(origin: Origin, height: Dec, radius: Dec) -> Self {
         let top_basis = origin.clone();
-        let bottom_basis = origin.offset_z(-height);
+        // let bottom_basis = origin.offset_z(-height);
 
         Self {
             top_basis,
-            bottom_basis,
+            // bottom_basis,
             steps: 10,
             top_cap: true,
             bottom_cap: true,
@@ -66,11 +66,11 @@ impl Cylinder {
 
     pub fn with_bottom_at(origin: Origin, height: Dec, radius: Dec) -> Self {
         let top_basis = origin.clone().offset_z(height);
-        let bottom_basis = origin;
+        //let bottom_basis = origin;
 
         Self {
             top_basis,
-            bottom_basis,
+            //bottom_basis,
             steps: 10,
             top_cap: true,
             bottom_cap: true,

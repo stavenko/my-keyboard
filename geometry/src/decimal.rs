@@ -267,7 +267,7 @@ impl ComplexField for Dec {
         todo!()
     }
 
-    fn powi(self, _n: i32) -> Self {
+    fn powi(self, n: i32) -> Self {
         todo!()
     }
 

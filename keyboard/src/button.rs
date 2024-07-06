@@ -57,8 +57,8 @@ impl ButtonMountKind {
     pub(crate) fn params(&self) -> ButtonMount {
         match self {
             ButtonMountKind::Chok => ButtonMount {
-                width: dec!(15).into(),
-                height: dec!(15).into(),
+                width: dec!(18).into(),
+                height: dec!(18).into(),
                 lock_width: dec!(13.8).into(),
                 lock_height: dec!(13.8).into(),
                 lock_depth: dec!(1.2).into(),
@@ -277,7 +277,7 @@ impl Button {
                 index.save_as_polygon(&top_pl1, None)?;
                 index.save_as_polygon(&top_pl2, None)?;
                 index.save_as_polygon(&top_pl3, None)?;
-                dbg!(">>>>", index.save_as_polygon(&top_pl4, None)?);
+                index.save_as_polygon(&top_pl4, None)?;
                 index.save_as_polygon(&tr, None)?;
                 index.save_as_polygon(&tl, None)?;
                 index.save_as_polygon(&tb, None)?;

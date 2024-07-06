@@ -1,13 +1,9 @@
-
 use geometry::{
     decimal::Dec,
     geometry::Geometry,
     hyper_path::{
-        hyper_line::HyperLine,
-        hyper_point::SuperPoint,
-        hyper_surface::{
-            simple_dynamic_surface::SimpleSurface,
-        },
+        hyper_line::HyperLine, hyper_point::SuperPoint,
+        hyper_surface::simple_dynamic_surface::SimpleSurface,
     },
     origin::Origin,
 };

@@ -13,7 +13,7 @@ use geometry::{
         hyper_point::SuperPoint,
         split_hyper_line::SplitHyperLine,
     },
-    indexes::geo_index::index::GeoIndex,
+    indexes::{aabb::Aabb, geo_index::index::GeoIndex},
 };
 use keyboard::{Angle, Button, ButtonsCollection, ButtonsColumn, RightKeyboardConfig};
 
@@ -207,7 +207,10 @@ fn main() -> Result<(), anyhow::Error> {
         )
         .build();
 
-    let index = GeoIndex::new();
+    let index = GeoIndex::new(Aabb::from_points(&[
+        Vector3::new(Dec::from(-50), Dec::from(-50), Dec::from(-50)),
+        Vector3::new(Dec::from(50), Dec::from(50), Dec::from(50)),
+    ]));
 
     #[rustfmt::skip]
     let _p1: &[Vector3<Dec>] = &[

@@ -49,26 +49,16 @@ where
             let b = self.0.get_t(tt);
             let c = self.1.get_t(tt);
             let d = self.1.get_t(t);
-            if index.save_as_polygon(&[a, b, c], None).is_err() {
-                // do something
-            }
-            if index.save_as_polygon(&[a, c, d], None).is_err() {
-                // do something
-            }
+            index.save_as_polygon(&[a, b, c], None).ok();
+            index.save_as_polygon(&[a, c, d], None).ok();
         } else {
             for (t, tt) in ParametricIterator::<L1::Scalar>::new(complexity) {
                 let a = self.0.get_t(t);
                 let b = self.0.get_t(tt);
                 let c = self.1.get_t(tt);
                 let d = self.1.get_t(t);
-                match index.save_as_polygon(&[a, b, c], None) {
-                    Err(_) => {}
-                    Ok(_) => {}
-                }
-                match index.save_as_polygon(&[a, c, d], None) {
-                    Err(_) => {}
-                    Ok(_) => {}
-                }
+                index.save_as_polygon(&[a, b, c], None).ok();
+                index.save_as_polygon(&[a, c, d], None).ok();
             }
         }
         Ok(())

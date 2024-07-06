@@ -71,18 +71,23 @@ impl<'a> SegmentRef<'a> {
         self.to() - self.from()
     }
 
+    #[allow(unused)]
     pub(crate) fn has(&self, v: PtId) -> bool {
         self.to_pt() == v || self.from_pt() == v
     }
 
+    #[allow(unused)]
+    #[allow(clippy::wrong_self_convention)]
     pub(crate) fn to_pt(&self) -> PtId {
         self.to
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub(crate) fn from_pt(&self) -> PtId {
         self.from
     }
 
+    #[allow(unused)]
     pub(crate) fn flip(self) -> Self {
         Self {
             to: self.from,
@@ -127,6 +132,7 @@ impl<'a> SegRef<'a> {
         self.to_pt() == v || self.from_pt() == v
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub(crate) fn to_pt(&self) -> PtId {
         let rib = self.index.ribs[&self.rib_id];
         match self.dir {
@@ -135,6 +141,7 @@ impl<'a> SegRef<'a> {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub(crate) fn from_pt(&self) -> PtId {
         let rib = self.index.ribs[&self.rib_id];
         match self.dir {
@@ -162,24 +169,6 @@ impl<'a> SegRef<'a> {
         Seg {
             rib_id: self.rib_id,
             dir: self.dir,
-        }
-    }
-
-    pub(crate) fn get_intersection_params_seg_ref(&self, to: &SegRef<'_>) -> Option<(Dec, Dec)> {
-        let segment_dir = to.dir().normalize();
-        let self_dir = self.dir().normalize();
-        let q = self.from() - to.from();
-
-        let dot = self_dir.dot(&segment_dir);
-
-        let m = Matrix2::new(Dec::from(1), -dot, dot, -Dec::from(1));
-        let b = -Vector2::new(q.dot(&self_dir), q.dot(&segment_dir));
-
-        if let Some(mi) = m.try_inverse() {
-            let st = mi * b;
-            Some((st.x / self.dir().magnitude(), st.y / to.dir().magnitude()))
-        } else {
-            None
         }
     }
 }
@@ -212,7 +201,7 @@ impl Seg {
             SegmentDir::Rev => rib.1,
         }
     }
-    pub(crate) fn to_ref<'a>(self, index: &'a GeoIndex) -> SegRef<'a> {
+    pub(crate) fn to_ref(self, index: &GeoIndex) -> SegRef<'_> {
         SegRef {
             rib_id: self.rib_id,
             dir: self.dir,

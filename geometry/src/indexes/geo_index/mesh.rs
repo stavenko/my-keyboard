@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet},
     ops::Deref,
 };
 
@@ -8,10 +8,14 @@ use nalgebra::Vector3;
 use stl_io::Triangle;
 use tap::TapFallible;
 
-use crate::decimal::Dec;
+use crate::{
+    decimal::Dec,
+    indexes::{geo_index::poly::Side, vertex_index::PtId},
+    planar::polygon::Polygon,
+};
 
 use super::{
-    index::{GeoIndex, PolygonRelation},
+    index::GeoIndex,
     poly::{PolyId, PolyRef},
     rib::{RibId, RibRef},
     tri_iter::TriIter,
@@ -43,7 +47,6 @@ impl<'a> Deref for MeshRef<'a> {
     }
 }
 
-#[allow(unused)]
 impl<'a> MeshRef<'a> {
     pub(crate) fn polygons(&self) -> impl Iterator<Item = PolyRef<'a>> + 'a {
         self.geo_index.polygons(&self.mesh_id)
@@ -131,75 +134,52 @@ impl<'a> MeshRefMut<'a> {
         self.geo_index.polygons(&self.mesh_id)
     }
 
-    pub fn boolean_union(self, _tool: MeshId) -> Vec<MeshRef<'a>> {
+    /*
+    pub fn boolean_union(self, tool: MeshId) -> Vec<MeshRef<'a>> {
         todo!();
     }
 
-    fn mark_polygons(&self, mesh: MeshId, visited: &mut BTreeMap<PolyId, PolygonRelation>) {
-        let mut polygons: VecDeque<PolyId> = self.geo_index.meshes[&mesh].0.clone().into();
-        while let Some(polygon_id) = polygons.pop_front() {
-            if visited.contains_key(&polygon_id) {
-                continue;
-            }
-            let mut is_found = false;
-            for r in self.geo_index.polygons[&polygon_id]
-                .segments
-                .iter()
-                .map(|s| s.rib_id)
-            {
-                if let Some(p) = self.geo_index.rib_to_poly[&r].iter().find(|pp| {
-                    self.geo_index.get_mesh_for_polygon(**pp) == self.mesh_id && **pp != polygon_id
-                }) {
-                    if visited.contains_key(p) {
-                        visited.insert(polygon_id, visited[&p]);
-                        is_found = true;
-                        break;
-                    }
-                }
-            }
-            if !is_found {
-                // println!("push back poly {polygon_id:?}");
-                polygons.push_back(polygon_id);
-            }
-        }
-    }
-
-    pub fn boolean_diff(self, tool: MeshId) -> anyhow::Result<()> {
+    pub fn boolean_diff_rust(self, tool: MeshId) -> anyhow::Result<Vec<MeshRef<'a>>> {
         let common_chains = self.geo_index.collect_common_chains(self.mesh_id, tool);
-        let mut visited = BTreeMap::new();
+        let visited = HashMap::new();
 
         for chain in common_chains {
-            visited.extend(self.geo_index.mark_polygons_around_common_chain(
-                chain,
-                self.mesh_id,
-                tool,
-            ));
-        }
+            for seg in chain {
+                let polygons = self.geo_index.rib_to_poly[&seg.rib_id]
+                    .iter()
+                    .map(|p| (*p, self.geo_index.get_mesh_for_polygon(*p)))
+                    .collect::<HashMap<_, _>>();
 
-        self.mark_polygons(self.mesh_id, &mut visited);
-        self.mark_polygons(tool, &mut visited);
+                let planes = polygons
+                    .iter()
+                    .map(|(poly_id, mesh_id)| {
+                        (mesh_id, self.geo_index.polygons[poly_id].plane.clone())
+                    })
+                    .collect::<HashMap<_, _>>();
 
-        for (poly_id, relation) in visited.into_iter() {
-            match relation {
-                PolygonRelation::SrcPolygonFrontOfTool => {}
-                PolygonRelation::SrcPolygonBackOfTool => {
-                    self.geo_index.remove_polygon(poly_id);
-                }
-                PolygonRelation::ToolPolygonBackOfSrc => {
-                    self.geo_index.flip_polygon(poly_id);
-                    self.geo_index.move_polygon(poly_id, self.mesh_id);
-                }
-                PolygonRelation::ToolPolygonFrontOfSrc => {
-                    self.geo_index.remove_polygon(poly_id);
+                for (polygon_id, mesh_id) in polygons.iter() {
+                    let points = self.geo_index.get_polygon_points(*polygon_id);
+                    let rib_points = [
+                        self.geo_index.ribs[&seg.rib_id].0,
+                        self.geo_index.ribs[&seg.rib_id].1,
+                    ]
+                    .into_iter()
+                    .collect::<HashSet<_>>();
+                    let plane = planes[mesh_id];
+                    points
+                        .difference(&rib_points)
+                        .map(|pt| {
+                            let v = self.geo_index.vertices.get_point(pt);
+                            plane.normal().dot(&v) - plane.d()
+                        })
+                        .s
                 }
             }
         }
-        if self.geo_index.meshes[&tool].0.is_empty() {
-            self.geo_index.remove_mesh(tool);
-        }
 
-        Ok(())
+        Err(anyhow::anyhow!("Implementing"))
     }
+    */
 
     pub fn remove(&mut self) {
         let polygon_ids = self.polygons().map(|p| p.poly_id).collect_vec();

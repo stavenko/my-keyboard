@@ -40,6 +40,14 @@ where
     pub fn new_4(a: T, b: T, c: T, d: T) -> Self {
         Self([a, b, c, d].to_vec())
     }
+
+    pub fn map<F>(mut self, map: F) -> Self
+    where
+        F: Fn(T) -> T,
+    {
+        self.0 = self.0.into_iter().map(map).collect();
+        self
+    }
 }
 
 pub trait ShiftInPlane {
@@ -88,12 +96,12 @@ where
         } else {
             let center = self.0.len() / 2;
             for (ix, p) in self.0.iter_mut().enumerate() {
-                if ix < center {
-                    p.set_point(p.point() + ext_b * amount)
-                } else if ix == center {
-                    p.set_point(p.point() + (ext_b.lerp(&ext_e, half)) * amount)
-                } else {
-                    p.set_point(p.point() + ext_e * amount)
+                match ix.cmp(&center) {
+                    std::cmp::Ordering::Less => p.set_point(p.point() + ext_b * amount),
+                    std::cmp::Ordering::Equal => {
+                        p.set_point(p.point() + (ext_b.lerp(&ext_e, half)) * amount)
+                    }
+                    std::cmp::Ordering::Greater => p.set_point(p.point() + ext_e * amount),
                 }
             }
         }

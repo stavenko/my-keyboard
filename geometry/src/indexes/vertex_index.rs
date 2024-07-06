@@ -3,15 +3,17 @@ use nalgebra::Vector3;
 
 use crate::decimal::Dec;
 
-use super::octree::{Node, Octree};
+use super::{
+    aabb::Aabb,
+    octree::{Node, Octree},
+    sphere::Sphere,
+};
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct VertexIndex {
     octree: Octree<usize>,
     points: Vec<Vector3<Dec>>,
 }
-
-pub const MAX_DIGITS: usize = 6;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub struct PtId(usize);
@@ -23,32 +25,24 @@ impl PartialEq<usize> for PtId {
 }
 
 impl VertexIndex {
-    fn vertex(mut v: Vector3<Dec>, quantification: usize) -> Vector3<Dec> {
-        v.x = v.x.round_dp(quantification as u32);
-        v.y = v.y.round_dp(quantification as u32);
-        v.z = v.z.round_dp(quantification as u32);
-        v
+    pub fn new(aabb: Aabb) -> Self {
+        Self {
+            octree: Octree::<usize>::new_with_aabb(Vec::new(), aabb),
+            points: Vec::new(),
+        }
     }
 
-    pub fn get_vertex_index(&mut self, vertex: Vector3<Dec>) -> PtId {
-        let vertex = Self::vertex(vertex, MAX_DIGITS);
-        if let Some(n) = self.octree.find(vertex) {
-            //println!("@HAS PT {}", n.data);
-            PtId(n.data)
+    pub fn get_or_insert_point(&mut self, vertex: Vector3<Dec>, separation_distance: Dec) -> PtId {
+        if let Some(n) = self.find_closest(vertex, separation_distance) {
+            n
         } else {
             self.points.push(vertex);
             let id = self.points.len() - 1;
-            //println!("@NEW PT {id}");
             let node = Node {
                 data: id,
                 point: vertex,
             };
             self.octree.insert(node);
-            /*
-            if id == 1551 {
-                panic!("insert point which is too close");
-            }
-            */
             PtId(id)
         }
     }
@@ -69,6 +63,21 @@ impl VertexIndex {
             .into_iter()
             .map(|vec| [vec.x.into(), vec.y.into(), vec.z.into()])
             .collect_vec()
+    }
+
+    pub fn find_closest(&self, center: Vector3<Dec>, distance: Dec) -> Option<PtId> {
+        let mut points = self.octree.query_within_sphere(Sphere {
+            center,
+            radius: distance,
+        });
+        points.sort_by_key(|node| (node.point - center).magnitude_squared());
+        points.first().map(|node| PtId(node.data))
+    }
+
+    pub(crate) fn set_initial_bb(&mut self, aabb: super::aabb::Aabb) {
+        if self.octree.is_empty() {
+            self.octree.set_aabb(aabb);
+        }
     }
 }
 

@@ -1,9 +1,5 @@
-//pub mod primitive_surface;
-//pub mod simple_surface;
-//pub mod surface;
-//pub mod surface_of_same_size;
-
 pub mod dynamic_surface;
+pub mod polygon_from_line_in_plane;
 pub mod primitive_dynamic_surface;
 pub mod simple_dynamic_surface;
 
@@ -20,7 +16,7 @@ mod tests {
             hyper_path::{HyperPath, Root},
             hyper_point::HyperPointT,
         },
-        indexes::geo_index::index::GeoIndex,
+        indexes::{aabb::Aabb, geo_index::index::GeoIndex},
     };
 
     use super::dynamic_surface::DynamicSurface;
@@ -55,7 +51,10 @@ mod tests {
         );
         let hp2 = Root::new().push_back(l2);
         let hs = DynamicSurface::new(hp, hp2);
-        let mut ix = GeoIndex::new();
+        let mut ix = GeoIndex::new(Aabb::from_points(&[
+            Vector3::new(Dec::from(-50), Dec::from(-50), Dec::from(-50)),
+            Vector3::new(Dec::from(50), Dec::from(50), Dec::from(50)),
+        ]));
         hs.polygonize(&mut ix, 10).unwrap();
     }
 
@@ -112,7 +111,10 @@ mod tests {
                 },
             ));
         let hs = DynamicSurface::new(hp, hp2);
-        let mut ix = GeoIndex::new();
+        let mut ix = GeoIndex::new(Aabb::from_points(&[
+            Vector3::new(Dec::from(-50), Dec::from(-50), Dec::from(-50)),
+            Vector3::new(Dec::from(50), Dec::from(50), Dec::from(50)),
+        ]));
         hs.polygonize(&mut ix, 10).unwrap();
     }
     #[test]
@@ -180,7 +182,10 @@ mod tests {
                 },
             ));
         let hs = DynamicSurface::new(hp2, hp);
-        let mut ix = GeoIndex::new();
+        let mut ix = GeoIndex::new(Aabb::from_points(&[
+            Vector3::new(Dec::from(-50), Dec::from(-50), Dec::from(-50)),
+            Vector3::new(Dec::from(50), Dec::from(50), Dec::from(50)),
+        ]));
         hs.polygonize(&mut ix, 10).unwrap();
     }
 
@@ -249,7 +254,10 @@ mod tests {
                 },
             ));
         let hs = DynamicSurface::new(hp, hp2);
-        let mut ix = GeoIndex::new();
+        let mut ix = GeoIndex::new(Aabb::from_points(&[
+            Vector3::new(Dec::from(-50), Dec::from(-50), Dec::from(-50)),
+            Vector3::new(Dec::from(50), Dec::from(50), Dec::from(50)),
+        ]));
         hs.polygonize(&mut ix, 10).unwrap();
     }
     /*

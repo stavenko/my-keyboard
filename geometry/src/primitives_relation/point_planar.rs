@@ -3,17 +3,12 @@ use num_traits::{Signed, Zero};
 
 use crate::{
     decimal::{Dec, NORMAL_DOT_ROUNDING, STABILITY_ROUNDING},
-    // edge::Edge,
-    indexes::{
-        geo_index::{poly::PolyRef, rib::RibId},
-        vertex_index::PtId,
-    },
     linear::{line::Line, ray::Ray, segment::Segment},
     planar::{plane::Plane, polygon::Polygon},
 };
 
 use super::{
-    linear::{LinearIntersection, LinearRefIntersection, LinearRefRelation, LinearRelation},
+    linear::{LinearIntersection, LinearRelation},
     relation::Relation,
 };
 
