@@ -105,7 +105,7 @@ impl ComplexField for Dec {
 
     #[doc = r" The modulus of this complex number."]
     fn modulus(self) -> Self::RealField {
-        todo!()
+        <Self as Signed>::abs(&self)
     }
 
     #[doc = r" The squared modulus of this complex number."]

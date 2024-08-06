@@ -117,7 +117,10 @@ impl<T: Clone> Octree<T> {
 
             OctreeContent::Container(ref mut v) => {
                 if let BoundNodeRelation::Outside = self.aabb.relate(&node) {
-                    panic!("Inserting point failed - not inside bounds ")
+                    panic!(
+                        "Inserting point failed - not inside bounds {:?} <== {} {} {} ",
+                        self.aabb, node.point.x, node.point.y, node.point.z
+                    );
                 }
                 v.push(node);
                 if v.len() > MAX_NODES {

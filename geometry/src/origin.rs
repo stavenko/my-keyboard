@@ -11,14 +11,6 @@ pub struct BaseOrigin<F> {
 
 pub type Origin = BaseOrigin<Dec>;
 
-/*
-#[derive(Clone, Debug)]
-pub struct Origin {
-    pub center: Vector3<Dec>,
-    pub rotation: UnitQuaternion<Dec>,
-}
-*/
-
 impl<F> Default for BaseOrigin<F>
 where
     F: Zero + Copy,

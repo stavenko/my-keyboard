@@ -205,6 +205,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd16c4719339c4530435d38e511904438d07cce7950afa3718a84ac36c10e89e"
 
 [[package]]
+name = "chok-hotswap"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "decimal",
+ "geometry",
+ "itertools",
+ "keyboard",
+ "nalgebra",
+ "num-traits",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "stl_io",
+]
+
+[[package]]
 name = "clap"
 version = "4.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"

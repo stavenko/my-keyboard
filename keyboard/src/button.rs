@@ -190,10 +190,10 @@ impl Button {
                     self.outer_right_top(thickness),
                 ];
                 let bottom = [
-                    self.inner_left_top(thickness),
-                    self.inner_left_bottom(thickness),
-                    self.inner_right_bottom(thickness),
                     self.inner_right_top(thickness),
+                    self.inner_right_bottom(thickness),
+                    self.inner_left_bottom(thickness),
+                    self.inner_left_top(thickness),
                 ];
 
                 index.save_as_polygon(&top, None)?;

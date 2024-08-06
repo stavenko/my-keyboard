@@ -4,6 +4,7 @@ use std::{
 };
 
 use nalgebra::{Matrix2, Vector2, Vector3};
+use num_traits::Zero;
 use uuid::Uuid;
 
 use crate::{decimal::Dec, indexes::vertex_index::PtId};
@@ -46,9 +47,9 @@ pub struct SegRef<'i> {
 
 #[derive(Copy, Clone)]
 pub struct SegmentRef<'i> {
-    pub(super) to: PtId,
-    pub(super) from: PtId,
-    pub(super) index: &'i GeoIndex,
+    to: PtId,
+    from: PtId,
+    index: &'i GeoIndex,
 }
 
 impl<'a> fmt::Debug for SegRef<'a> {
@@ -59,6 +60,13 @@ impl<'a> fmt::Debug for SegRef<'a> {
     }
 }
 impl<'a> SegmentRef<'a> {
+    pub fn new(from: PtId, to: PtId, index: &'a GeoIndex) -> Self {
+        if to == from {
+            panic!("Same point - not a segment");
+        }
+        Self { to, from, index }
+    }
+
     pub fn from(&self) -> Vector3<Dec> {
         self.index.vertices.get_point(self.from_pt())
     }
@@ -93,6 +101,17 @@ impl<'a> SegmentRef<'a> {
             to: self.from,
             from: self.to,
             index: self.index,
+        }
+    }
+
+    pub(crate) fn distance_to_pt_squared(&self, pt: Vector3<Dec>) -> Dec {
+        let v = pt - self.from();
+        if v.magnitude_squared().is_zero() {
+            Dec::zero()
+        } else {
+            let dir = self.dir().normalize();
+            let t = v.dot(&dir);
+            v.dot(&v) - t * t
         }
     }
 
@@ -134,7 +153,11 @@ impl<'a> SegRef<'a> {
 
     #[allow(clippy::wrong_self_convention)]
     pub(crate) fn to_pt(&self) -> PtId {
-        let rib = self.index.ribs[&self.rib_id];
+        let rib = self
+            .index
+            .ribs
+            .get(&self.rib_id)
+            .unwrap_or_else(|| panic!("No rib found: {:?}", self.rib_id));
         match self.dir {
             SegmentDir::Fow => rib.1,
             SegmentDir::Rev => rib.0,
@@ -143,7 +166,11 @@ impl<'a> SegRef<'a> {
 
     #[allow(clippy::wrong_self_convention)]
     pub(crate) fn from_pt(&self) -> PtId {
-        let rib = self.index.ribs[&self.rib_id];
+        let rib = self
+            .index
+            .ribs
+            .get(&self.rib_id)
+            .unwrap_or_else(|| panic!("No rib found: {:?}", self.rib_id));
         match self.dir {
             SegmentDir::Fow => rib.0,
             SegmentDir::Rev => rib.1,

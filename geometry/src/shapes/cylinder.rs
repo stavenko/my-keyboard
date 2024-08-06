@@ -2,11 +2,11 @@ use nalgebra::{ComplexField, Vector3};
 use num_traits::Zero;
 use rust_decimal::Decimal;
 
-use crate::{decimal::Dec, origin::Origin};
+use crate::{decimal::Dec, geometry::GeometryDyn, indexes::geo_index::index, origin::Origin};
 
+#[derive(Clone)]
 pub struct Cylinder {
     top_basis: Origin,
-    //bottom_basis: Origin,
     steps: usize,
     top_cap: bool,
     bottom_cap: bool,
@@ -15,12 +15,13 @@ pub struct Cylinder {
 }
 
 impl Cylinder {
-    pub fn centered(origin: Origin, height: Dec, radius: Dec) -> Self {
+    pub fn centered(origin: Origin, height: impl Into<Dec>, radius: impl Into<Dec>) -> Self {
+        let radius = radius.into();
+        let height = height.into();
         let top_basis = origin.clone().offset_z(height / 2);
 
         Self {
             top_basis,
-            //bottom_basis,
             steps: 10,
             top_cap: true,
             bottom_cap: true,
@@ -49,13 +50,13 @@ impl Cylinder {
         self
     }
 
-    pub fn with_top_at(origin: Origin, height: Dec, radius: Dec) -> Self {
+    pub fn with_top_at(origin: Origin, height: impl Into<Dec>, radius: impl Into<Dec>) -> Self {
+        let radius = radius.into();
+        let height = height.into();
         let top_basis = origin.clone();
-        // let bottom_basis = origin.offset_z(-height);
 
         Self {
             top_basis,
-            // bottom_basis,
             steps: 10,
             top_cap: true,
             bottom_cap: true,
@@ -66,11 +67,9 @@ impl Cylinder {
 
     pub fn with_bottom_at(origin: Origin, height: Dec, radius: Dec) -> Self {
         let top_basis = origin.clone().offset_z(height);
-        //let bottom_basis = origin;
 
         Self {
             top_basis,
-            //bottom_basis,
             steps: 10,
             top_cap: true,
             bottom_cap: true,
@@ -79,7 +78,7 @@ impl Cylinder {
         }
     }
 
-    pub fn render(self) -> Vec<Vec<Vector3<Dec>>> {
+    pub fn render(&self) -> Vec<Vec<Vector3<Dec>>> {
         let up = self.top_basis.z();
 
         let mut top = Vec::new();
@@ -119,5 +118,16 @@ impl Cylinder {
         }
 
         wall
+    }
+}
+
+impl GeometryDyn for Cylinder {
+    fn polygonize(&self, index: &mut index::GeoIndex, _complexity: usize) -> anyhow::Result<()> {
+        for (i, p) in self.render().into_iter().enumerate() {
+            //println!("~~~~~~~~~~~~~~~~~~~{i}~~~~~~~~~~~~~~~~~");
+            index.save_as_polygon(&p, None)?;
+        }
+
+        Ok(())
     }
 }

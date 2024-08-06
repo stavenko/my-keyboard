@@ -25,7 +25,7 @@ use super::{
 pub struct Mesh(pub(super) Vec<PolyId>);
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-pub struct MeshId(pub(super) usize);
+pub struct MeshId(pub usize);
 
 impl PartialEq<usize> for MeshId {
     fn eq(&self, other: &usize) -> bool {

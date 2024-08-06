@@ -1,9 +1,14 @@
-use std::collections::HashSet;
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+    iter::FilterMap,
+    rc::Rc,
+};
 
 use anyhow::anyhow;
 use geometry::{
     decimal::Dec,
-    geometry::Geometry,
+    geometry::{Geometry, GeometryDyn},
     hyper_path::{
         hyper_line::{HyperLine, ShiftInPlane},
         hyper_path::{HyperPath, Root},
@@ -24,9 +29,23 @@ use nalgebra::Vector3;
 use rust_decimal_macros::dec;
 
 use crate::{
-    bolt_point::BoltPoint, button_collections::ButtonsCollection,
+    bolt_point::BoltPoint, button_collections::ButtonsCollection, hole::Hole,
     keyboard_builder::KeyboardBuilder, next_and_peek::NextAndPeekBlank,
 };
+
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+pub enum KeyboardMesh {
+    ButtonsHull,
+    Bottom,
+    PcbMount,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum MaterialAddition {
+    InnerSurface,
+    OuterSurface,
+    Both,
+}
 
 pub struct RightKeyboardConfig {
     pub(crate) main_buttons: ButtonsCollection,
@@ -34,7 +53,10 @@ pub struct RightKeyboardConfig {
     pub(crate) table_outline: Root<SuperPoint<Dec>>,
     pub(crate) main_plane_thickness: Dec,
     pub(crate) bottom_thickness: Dec,
-    pub(crate) bolt_points: Vec<BoltPoint>,
+    pub(crate) additional_material:
+        HashMap<KeyboardMesh, Vec<(MaterialAddition, Rc<dyn GeometryDyn>)>>,
+
+    pub(crate) holes: HashMap<KeyboardMesh, Vec<Rc<dyn GeometryDyn>>>,
 }
 
 impl RightKeyboardConfig {
@@ -534,84 +556,8 @@ impl RightKeyboardConfig {
         self.inner_wall_surface(index)?;
         let inner_border = index.get_current_default_mesh();
 
-        let bolt_polygons: Vec<MeshId> = self
-            .bolt_points
-            .iter()
-            .filter_map(|bolt_point| {
-                index.create_new_mesh_and_set_as_default();
-                let bolt_thread_material = bolt_point.get_bolt_thread_material(index).ok()?;
-
-                index.create_new_mesh_and_set_as_default();
-                let nut_well = bolt_point.get_bolt_nut_well(index).ok()?;
-
-                index.create_new_mesh_and_set_as_default();
-                let thread_hole = bolt_point.get_bolt_thread_hole(index).ok()?;
-
-                let top_inside_mat =
-                    index.select_polygons(top_plane, bolt_thread_material, PolygonFilter::Back);
-
-                let nut_related_removals = if let Some(nut_well) = nut_well {
-                    let top_outside_hole =
-                        index.select_polygons(top_plane, nut_well, PolygonFilter::Front);
-
-                    let top_plane_between_mat_and_nut = top_inside_mat
-                        .into_iter()
-                        .collect::<HashSet<_>>()
-                        .intersection(&top_outside_hole.into_iter().collect::<HashSet<_>>())
-                        .copied()
-                        .collect_vec();
-
-                    [
-                        index.select_polygons(top_plane, nut_well, PolygonFilter::Back),
-                        index.select_polygons(bottom_plane, nut_well, PolygonFilter::Back),
-                        index.select_polygons(nut_well, bottom_plane, PolygonFilter::Front),
-                        index.select_polygons(thread_hole, nut_well, PolygonFilter::Back),
-                        index.select_polygons(nut_well, thread_hole, PolygonFilter::Back),
-                        top_plane_between_mat_and_nut,
-                    ]
-                    .concat()
-                } else {
-                    Vec::new()
-                };
-
-                let to_remove = [
-                    nut_related_removals,
-                    index.select_polygons(bolt_thread_material, bottom_plane, PolygonFilter::Front),
-                    index.select_polygons(top_plane, bolt_thread_material, PolygonFilter::Back),
-                    index.select_polygons(thread_hole, bolt_thread_material, PolygonFilter::Front),
-                    index.select_polygons(bolt_thread_material, thread_hole, PolygonFilter::Back),
-                    index.select_polygons(top_plane, thread_hole, PolygonFilter::Back),
-                    index.select_polygons(bottom_plane, thread_hole, PolygonFilter::Back),
-                ]
-                .concat();
-
-                let to_flip = [
-                    index.get_mesh_polygon_ids(thread_hole).collect_vec(),
-                    nut_well
-                        .into_iter()
-                        .flat_map(|m| index.get_mesh_polygon_ids(m))
-                        .collect_vec(),
-                ]
-                .concat();
-
-                for p in to_remove {
-                    index.remove_polygon(p);
-                }
-                for p in to_flip {
-                    index.flip_polygon(p);
-                }
-
-                Some(
-                    [
-                        vec![bolt_thread_material],
-                        vec![thread_hole],
-                        nut_well.into_iter().collect(),
-                    ]
-                    .concat(),
-                )
-            })
-            .flatten()
-            .collect_vec();
+        let additional_material =
+            self.add_material(KeyboardMesh::Bottom, top_plane, bottom_plane, index)?;
 
         let to_delete = [
             index.select_polygons(inner_border, plate_border, PolygonFilter::Front),
@@ -633,10 +579,11 @@ impl RightKeyboardConfig {
         index.move_all_polygons(bottom_plane, plate_border);
         index.move_all_polygons(top_plane, plate_border);
         index.move_all_polygons(inner_border, plate_border);
-        for mesh_id in bolt_polygons {
-            index.move_all_polygons(mesh_id, plate_border);
+        for mat in additional_material {
+            index.move_all_polygons(mat, plate_border);
         }
 
+        self.apply_holes(KeyboardMesh::Bottom, plate_border, index)?;
         Ok(plate_border)
     }
 
@@ -644,13 +591,105 @@ impl RightKeyboardConfig {
         Err(anyhow!("not implemented"))
     }
 
-    fn usb_connection(&self, index: &mut GeoIndex) -> anyhow::Result<MeshId> {
-        Err(anyhow!("not implemented"))
+    fn add_material(
+        &self,
+        to: KeyboardMesh,
+        inner_mesh: MeshId,
+        outer_mesh: MeshId,
+        index: &mut GeoIndex,
+    ) -> anyhow::Result<Vec<MeshId>> {
+        let material_polygons = self
+            .additional_material
+            .iter()
+            .flat_map(|mat| {
+                if to == *mat.0 {
+                    (*mat.1).clone()
+                } else {
+                    Vec::new()
+                }
+            })
+            .filter_map(|(addition, material)| {
+                index.create_new_mesh_and_set_as_default();
+                material.polygonize(index, 0).ok()?;
+                let bolt_head_material = index.get_current_default_mesh();
+
+                match addition {
+                    MaterialAddition::InnerSurface => {
+                        let bolt_head_below_outer = index
+                            .select_polygons(bolt_head_material, outer_mesh, PolygonFilter::Back)
+                            .into_iter()
+                            .collect::<HashSet<_>>();
+
+                        let bolt_head_above_inner = index
+                            .select_polygons(bolt_head_material, inner_mesh, PolygonFilter::Back)
+                            .into_iter()
+                            .collect::<HashSet<_>>();
+                        let betwee_walls = bolt_head_above_inner
+                            .intersection(&bolt_head_below_outer)
+                            .copied()
+                            .collect_vec();
+
+                        let to_remove = [
+                            index.select_polygons(
+                                inner_mesh,
+                                bolt_head_material,
+                                PolygonFilter::Back,
+                            ),
+                            index.select_polygons(
+                                bolt_head_material,
+                                outer_mesh,
+                                PolygonFilter::Front,
+                            ),
+                            betwee_walls,
+                        ]
+                        .concat();
+
+                        for p in to_remove {
+                            index.remove_polygon(p);
+                        }
+
+                        Some(bolt_head_material)
+                    }
+                    MaterialAddition::OuterSurface => todo!(),
+                    MaterialAddition::Both => todo!(),
+                }
+            })
+            .collect_vec();
+        Ok(material_polygons)
+    }
+
+    fn apply_holes(
+        &self,
+        holes: KeyboardMesh,
+        to_mesh: MeshId,
+        index: &mut GeoIndex,
+    ) -> anyhow::Result<()> {
+        for hole in self.holes.get(&holes).into_iter().flatten() {
+            index.create_new_mesh_and_set_as_default();
+            hole.polygonize(index, 0)?;
+            let hole_mesh = index.get_current_default_mesh();
+            println!("hole mesh: {hole_mesh:?}");
+
+            let to_remove = [
+                index.select_polygons(hole_mesh, to_mesh, PolygonFilter::Front),
+                index.select_polygons(to_mesh, hole_mesh, PolygonFilter::Back),
+            ]
+            .concat();
+            let to_flip = [index.select_polygons(hole_mesh, to_mesh, PolygonFilter::Back)].concat();
+            for p in to_remove {
+                index.remove_polygon(p);
+            }
+            for p in to_flip {
+                index.flip_polygon(p);
+            }
+            index.move_all_polygons(hole_mesh, to_mesh);
+        }
+        Ok(())
     }
 
     pub fn buttons_hull(&self, index: &mut GeoIndex) -> anyhow::Result<MeshId> {
         self.inner_wall_surface(index)?;
-        let inner_wall_surface = index.get_current_default_mesh();
+        let hull = index.get_current_default_mesh();
 
         index.create_new_mesh_and_set_as_default();
         self.outer_wall_surface(index)?;
@@ -669,117 +708,19 @@ impl RightKeyboardConfig {
         let table_bottom_surface = index.get_current_default_mesh();
 
         index.create_new_mesh_and_set_as_default();
-        let usb_connection = self.usb_connection(index)?;
 
-        let bolt_polygons = self
-            .bolt_points
-            .iter()
-            .filter_map(|bolt_point| {
-                index.create_new_mesh_and_set_as_default();
-                let bolt_head_hole = bolt_point.get_bolt_head_hole_bounds(index).ok()?;
-                println!("{bolt_head_hole:?}");
-
-                index.create_new_mesh_and_set_as_default();
-                let bolt_head_material = bolt_point.get_bolt_head_material_bounds(index).ok()?;
-
-                index.create_new_mesh_and_set_as_default();
-                let thread_hole = bolt_point.get_bolt_thread_head_hole_bounds(index).ok()?;
-
-                let inner_wall_outside_hole =
-                    index.select_polygons(inner_wall_surface, bolt_head_hole, PolygonFilter::Front);
-
-                let inner_wall_inside_material = index.select_polygons(
-                    inner_wall_surface,
-                    bolt_head_material,
-                    PolygonFilter::Back,
-                );
-
-                let inner_wall_between_material_and_hole = inner_wall_outside_hole
-                    .into_iter()
-                    .collect::<HashSet<_>>()
-                    .intersection(
-                        &inner_wall_inside_material
-                            .into_iter()
-                            .collect::<HashSet<_>>(),
-                    )
-                    .copied()
-                    .collect_vec();
-
-                /*
-                let outer_wall_outside_hole =
-                    index.select_polygons(outer_wall_surface, bolt_head_hole, PolygonFilter::Front);
-
-                let outer_wall_inside_material = index.select_polygons(
-                    outer_wall_surface,
-                    bolt_head_material,
-                    PolygonFilter::Back,
-                );
-                let outer_wall_between_material_and_hole = outer_wall_outside_hole
-                    .into_iter()
-                    .collect::<HashSet<_>>()
-                    .intersection(
-                        &outer_wall_inside_material
-                            .into_iter()
-                            .collect::<HashSet<_>>(),
-                    )
-                    .copied()
-                    .collect_vec();
-
-                */
-
-                let to_remove = [
-                    index.select_polygons(
-                        bolt_head_material,
-                        outer_wall_surface,
-                        PolygonFilter::Front,
-                    ),
-                    index.select_polygons(bolt_head_hole, outer_wall_surface, PolygonFilter::Front),
-                    index.select_polygons(outer_wall_surface, bolt_head_hole, PolygonFilter::Back),
-                    index.select_polygons(inner_wall_surface, bolt_head_hole, PolygonFilter::Back),
-                    index.select_polygons(bolt_head_material, thread_hole, PolygonFilter::Back),
-                    index.select_polygons(bolt_head_hole, thread_hole, PolygonFilter::Back),
-                    index.select_polygons(thread_hole, bolt_head_material, PolygonFilter::Front),
-                    index.select_polygons(thread_hole, bolt_head_hole, PolygonFilter::Back),
-                    index.select_polygons(inner_wall_surface, thread_hole, PolygonFilter::Back),
-                    inner_wall_between_material_and_hole,
-                    // outer_wall_between_material_and_hole,
-                ]
-                .concat();
-
-                let to_flip = [
-                    //index.get_polygon_with_root_parent(PolyId(2639)),
-                    //index.get_polygon_with_root_parent(PolyId(1677)),
-                    //index.select_polygons(bolt_head_hole, outer_wall_surface, PolygonFilter::Back),
-                    //index.select_polygons(inner_wall_surface, bolt_head_hole, PolygonFilter::Back),
-                    index.get_mesh_polygon_ids(thread_hole).collect_vec(),
-                    index.get_mesh_polygon_ids(bolt_head_hole).collect_vec(),
-                ]
-                .concat()
-                .into_iter()
-                .sorted()
-                .dedup();
-
-                for p in to_remove {
-                    index.remove_polygon(p);
-                }
-                for p in to_flip {
-                    index.flip_polygon(p);
-                }
-
-                Some([bolt_head_material, bolt_head_hole, thread_hole])
-                //Some([])
-            })
-            .flatten()
-            .collect_vec();
-
-        index.move_all_polygons(outer_wall_surface, inner_wall_surface);
-        index.move_all_polygons(buttons, inner_wall_surface);
-        index.move_all_polygons(buttons_filling, inner_wall_surface);
-        index.move_all_polygons(table_bottom_surface, inner_wall_surface);
-        for mesh_id in bolt_polygons {
-            index.move_all_polygons(mesh_id, inner_wall_surface);
+        let addition_material_polygons =
+            self.add_material(KeyboardMesh::ButtonsHull, hull, outer_wall_surface, index)?;
+        index.move_all_polygons(outer_wall_surface, hull);
+        index.move_all_polygons(buttons, hull);
+        index.move_all_polygons(buttons_filling, hull);
+        index.move_all_polygons(table_bottom_surface, hull);
+        for mesh_id in addition_material_polygons {
+            index.move_all_polygons(mesh_id, hull);
         }
 
-        Ok(inner_wall_surface)
+        self.apply_holes(KeyboardMesh::ButtonsHull, hull, index)?;
+        Ok(hull)
+        //Ok(MeshId(0))
     }
 }

@@ -6,6 +6,7 @@ members = [
   "smol", 
   "stand", 
   "ergoton",
+  "chok-hotswap",
 #  "mcut",
 # "mcut-sys"
 ]

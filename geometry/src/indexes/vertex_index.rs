@@ -1,3 +1,5 @@
+use core::fmt;
+
 use itertools::Itertools;
 use nalgebra::Vector3;
 
@@ -21,6 +23,12 @@ pub struct PtId(usize);
 impl PartialEq<usize> for PtId {
     fn eq(&self, other: &usize) -> bool {
         self.0 == *other
+    }
+}
+
+impl fmt::Display for PtId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 

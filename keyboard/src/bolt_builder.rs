@@ -6,6 +6,7 @@ use crate::{bolt::Nut, Bolt};
 pub struct BoltBuilder {
     nut: Option<Nut>,
     diameter: Option<Dec>,
+    thread_inner_diameter: Option<Dec>,
     height: Option<Dec>,
     head_diameter: Option<Dec>,
     head_height: Option<Dec>,
@@ -18,8 +19,12 @@ impl BoltBuilder {
         self.diameter(Dec::from(2)).nut(Nut::m2_hex())
     }
 
-    pub fn height(mut self, height: Dec) -> Self {
-        self.height = Some(height);
+    pub fn m1_no_nut(self) -> Self {
+        self.diameter(Dec::from(1)).no_nut()
+    }
+
+    pub fn height(mut self, height: impl Into<Dec>) -> Self {
+        self.height = Some(height.into());
         self
     }
 
@@ -28,13 +33,18 @@ impl BoltBuilder {
         self
     }
 
+    pub fn thread_inner_diameter(mut self, thread_inner_diameter: impl Into<Dec>) -> Self {
+        self.thread_inner_diameter = Some(thread_inner_diameter.into());
+        self
+    }
+
     pub fn head_diameter(mut self, head_diameter: Dec) -> Self {
         self.head_diameter = Some(head_diameter);
         self
     }
 
-    pub fn head_height(mut self, head_height: Dec) -> Self {
-        self.head_height = Some(head_height);
+    pub fn head_height(mut self, head_height: impl Into<Dec>) -> Self {
+        self.head_height = Some(head_height.into());
         self
     }
 
@@ -53,6 +63,7 @@ impl BoltBuilder {
             diameter: self.diameter.expect("Bolt diameter not specified"),
             head_height: self.head_height.expect("Head head not specified"),
             height: self.height.expect("Bolt height is not specified"),
+            thread_inner_diameter: self.thread_inner_diameter,
             nut: self.nut,
         }
     }

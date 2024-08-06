@@ -10,6 +10,7 @@ pub struct Bolt {
     pub(crate) head_height: Dec,
     /// Height of whole bolt without head
     pub(crate) height: Dec,
+    pub(crate) thread_inner_diameter: Option<Dec>,
     pub(crate) nut: Option<Nut>,
 }
 
@@ -25,6 +26,11 @@ pub enum Nut {
 }
 
 impl Nut {
+    pub fn height(&self) -> Dec {
+        match self {
+            Nut::Hex { height, .. } => *height,
+        }
+    }
     pub fn m2_hex() -> Self {
         let outer_diameter = dec!(4) / dec!(3) * dec!(4);
         Self::Hex {

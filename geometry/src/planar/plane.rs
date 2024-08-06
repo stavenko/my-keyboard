@@ -97,9 +97,14 @@ impl Plane {
         self.normal * self.d
     }
 
-    pub(crate) fn project_unit(&self, unit: Vector3<Dec>) -> Vector3<Dec> {
+    pub(crate) fn project_unit(&self, unit: Vector3<Dec>) -> Option<Vector3<Dec>> {
         let dot = self.normal.dot(&unit);
         let ortho = self.normal * dot;
-        (unit - ortho).normalize()
+        let in_plane_vec = unit - ortho;
+        if in_plane_vec.magnitude() == Dec::zero() {
+            println!("nothing can be projected on plane DBG: {dot}, {ortho:?}, {unit:?}");
+            return None;
+        }
+        Some((unit - ortho).normalize())
     }
 }

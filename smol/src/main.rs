@@ -15,9 +15,12 @@ use geometry::{
     },
     indexes::{aabb::Aabb, geo_index::index::GeoIndex},
     origin::Origin,
+    polygon_basis::PolygonBasis,
+    shapes::Cylinder,
 };
 use keyboard::{
-    Angle, Bolt, BoltPoint, Button, ButtonsCollection, ButtonsColumn, RightKeyboardConfig,
+    Angle, Bolt, BoltPoint, Button, ButtonsCollection, ButtonsColumn, Hole, KeyboardMesh,
+    RightKeyboardConfig,
 };
 
 mod cli;
@@ -25,39 +28,38 @@ mod cli;
 fn main() -> Result<(), anyhow::Error> {
     let cli = cli::Command::parse();
 
+    let m2_10_nut = Bolt::build()
+        .m2()
+        .head_height(Dec::from(1.2))
+        .head_diameter(Dec::from(4.2))
+        .height(Dec::from(10))
+        .build();
+
     let m2_10 = Bolt::build()
         .m2()
-        .head_height(Dec::from(2))
+        .head_height(dec!(1.2))
         .head_diameter(Dec::from(4))
-        .height(Dec::from(10))
+        .height(dec!(10) - dec!(1.2))
+        .thread_inner_diameter(dec!(1.2))
         .no_nut()
         .build();
 
-    let m2_4 = Bolt::build()
-        .m2()
-        .head_height(Dec::from(2))
-        .head_diameter(Dec::from(4))
-        .height(Dec::from(4))
-        .build();
-
-    let m2_4_n = Bolt::build()
-        .m2()
-        .head_height(Dec::from(2))
-        .head_diameter(Dec::from(4))
-        .height(Dec::from(4))
-        .no_nut()
+    let m1_8 = Bolt::build()
+        .m1_no_nut()
+        .head_height(Dec::from(0.8))
+        .head_diameter(Dec::from(1.6))
+        .height(Dec::from(8))
         .build();
 
     let keyboard = RightKeyboardConfig::build()
         .wall_thickness(4)
         .bottom_thickness(2)
         .add_bolt(
-            BoltPoint::new(m2_10.clone())
-                .head_up_extension(20)
-                .nut_material_gap(1)
-                .thread_down_extension(20)
-                .thread_material_gap(dec!(0.5))
-                .radial_head_extension(dec!(0.7))
+            KeyboardMesh::ButtonsHull,
+            KeyboardMesh::Bottom,
+            BoltPoint::new(m2_10_nut.clone())
+                .head_thread_material_gap(2)
+                .radial_head_material_extention(dec!(1))
                 .origin(
                     Origin::new()
                         .offset_x(-15)
@@ -68,32 +70,33 @@ fn main() -> Result<(), anyhow::Error> {
                                 * Angle::from_deg(-75).rad(),
                         )
                         .rotate_axisangle(Vector3::x() * Angle::from_deg(30).rad())
-                        .offset_z(-5),
+                        .offset_y(5)
+                        .offset_z(-10),
                 ),
         )
         .add_bolt(
-            BoltPoint::new(m2_4.clone())
-                .head_up_extension(20)
-                .nut_material_gap(dec!(1.8))
-                .thread_down_extension(20)
-                .thread_material_gap(dec!(0.5))
-                .radial_head_extension(dec!(0.7))
+            KeyboardMesh::ButtonsHull,
+            KeyboardMesh::Bottom,
+            BoltPoint::new(m2_10)
+                .thread_hole_radius_plastic_modification(dec!(1.6))
+                .radial_head_material_extention(dec!(1))
+                .head_thread_material_gap(4)
                 .origin(
                     Origin::new()
                         .offset_x(16)
-                        .offset_y(-dec!(11.5))
+                        .offset_y(-dec!(12.5))
                         .offset_z(dec!(0.4))
                         .rotate_axisangle(Vector3::x() * Angle::from_deg(10).rad())
-                        .offset_z(3),
+                        .offset_z(dec!(2.5)),
                 ),
         )
         .add_bolt(
-            BoltPoint::new(m2_4.clone())
-                .head_up_extension(20)
-                .nut_material_gap(2)
-                .thread_down_extension(20)
-                .thread_material_gap(dec!(1.5))
-                .radial_head_extension(dec!(0.7))
+            KeyboardMesh::ButtonsHull,
+            KeyboardMesh::Bottom,
+            BoltPoint::new(m1_8)
+                .radial_head_material_extention(dec!(1))
+                .thread_hole_radius_plastic_modification(1.8)
+                .head_thread_material_gap(4)
                 .origin(
                     Origin::new()
                         .offset_x(15)
@@ -101,7 +104,7 @@ fn main() -> Result<(), anyhow::Error> {
                         .offset_z(dec!(0.4))
                         .rotate_axisangle(Vector3::x() * Angle::from_deg(-15).rad())
                         .offset_y(dec!(-1) + dec!(0.6))
-                        .offset_z(3),
+                        .offset_z(2),
                 ),
         )
         .main(
@@ -285,6 +288,45 @@ fn main() -> Result<(), anyhow::Error> {
                     ),
                 ),
         )
+        .add_main_hole(
+            Hole::build()
+                .shape(
+                    Cylinder::with_top_at(
+                        Origin::new()
+                            .offset_y(-25)
+                            .offset_z(15)
+                            .rotate_axisangle(Vector3::x() * Angle::from_deg(67).rad())
+                            .rotate_axisangle(Vector3::y() * Angle::from_deg(20).rad())
+                            .offset_z(1),
+                        5,
+                        4,
+                    )
+                    .top_cap(false)
+                    .bottom_cap(false)
+                    .steps(16),
+                )
+                .build()?,
+        )
+        .add_main_hole(
+            Hole::build()
+                .shape(
+                    Cylinder::with_top_at(
+                        Origin::new()
+                            .offset_y(-25)
+                            .offset_z(15)
+                            .rotate_axisangle(Vector3::x() * Angle::from_deg(67).rad())
+                            .rotate_axisangle(Vector3::y() * Angle::from_deg(20).rad())
+                            //.offset_y(-4)
+                            .offset_z(-1),
+                        5,
+                        5.5,
+                    )
+                    //.top_cap(false)
+                    .bottom_cap(false)
+                    .steps(6),
+                )
+                .build()?,
+        )
         .build();
 
     println!("create main");
@@ -294,6 +336,29 @@ fn main() -> Result<(), anyhow::Error> {
     ]))
     .input_polygon_min_rib_length(dec!(0.05))
     .points_precision(dec!(0.001));
+    let some_basis = PolygonBasis {
+        center: Vector3::new(
+            dec!(-1.5543950009929657439721960749).into(),
+            dec!(-23.402748182863959638629538724).into(),
+            dec!(16.084464323260701317707916789).into(),
+        ),
+        x: Vector3::new(
+            dec!(0.5579776416337965548034479667).into(),
+            dec!(-0.6844767094290788649763709834).into(),
+            dec!(0.4692042046763081230933800416).into(),
+        ),
+        y: Vector3::new(
+            dec!(-0.6450649795271313430775016103).into(),
+            dec!(-0.7134427578111101333039070128).into(),
+            dec!(-0.2736614761243154445197904833).into(),
+        ),
+    };
+
+    let mut shifted_basis = some_basis.clone();
+    shifted_basis.center += some_basis.x * Dec::from(5);
+
+    //main.poly_split_debug(3389, some_basis);
+    //main.poly_split_debug(3388, shifted_basis);
 
     keyboard.buttons_hull(&mut main).unwrap();
 

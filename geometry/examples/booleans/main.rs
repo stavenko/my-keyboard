@@ -1,22 +1,30 @@
-/*
 use std::{
-    borrow::Cow,
+    collections::HashSet,
     fs::{self, OpenOptions},
     path::PathBuf,
 };
 
 use clap::Parser;
 use geometry::{
-    basis::Basis,
-    decimal::{Dec, STABILITY_ROUNDING},
-    indexes::geo_index::index::GeoIndex,
-    shapes,
+    decimal::Dec,
+    geometry::GeometryDyn,
+    indexes::{
+        aabb::Aabb,
+        geo_index::{
+            index::{GeoIndex, PolygonFilter},
+            mesh::MeshId,
+            poly::PolyId,
+        },
+    },
+    origin::{self, Origin},
+    polygon_basis::PolygonBasis,
+    shapes::{Cylinder, Plane, Rect},
 };
 
-use nalgebra::{UnitQuaternion, UnitVector3, Vector3};
-use num_traits::One;
+use itertools::Itertools;
+use nalgebra::Vector3;
+use num_traits::{Inv, One};
 use rust_decimal_macros::dec;
-
 
 #[derive(Parser)]
 pub struct Command {
@@ -24,45 +32,466 @@ pub struct Command {
     pub output_path: PathBuf,
 }
 
-fn bigger_by_smaller(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
-    let mut index = GeoIndex::new();
+fn bigger_by_smaller(file_root: PathBuf) -> anyhow::Result<String> {
+    let mut index = GeoIndex::new(Aabb::from_points(&[
+        Vector3::new(Dec::from(-10), Dec::from(-10), Dec::from(-10)),
+        Vector3::new(Dec::from(15), Dec::from(14), Dec::from(10)),
+    ]))
+    .debug_svg_path(file_root.clone())
+    .input_polygon_min_rib_length(dec!(0.05))
+    .points_precision(dec!(0.001));
 
-    let zz = Vector3::z();
-    let yy = Vector3::y();
-    let xx = yy.cross(&zz).normalize();
+    let zero = Origin::new();
 
-    let _zero_basis = Basis::new(xx, yy, zz, Vector3::zeros())?;
+    let smaller_box = Rect::centered(zero.clone(), Dec::one(), Dec::one(), Dec::one());
 
-    let smaller_box = shapes::rect(
-        _zero_basis.clone(),
-        Dec::one() * 1,
-        Dec::one() * 1,
-        Dec::one() * 1,
-    );
+    let bigger_box = Rect::centered(zero, Dec::one() * 2, Dec::one() * 2, Dec::one() * 2);
 
-    let bigger_box = index.save_mesh(
-        shapes::rect(_zero_basis, Dec::one() * 2, Dec::one() * 2, Dec::one() * 2)
-            .into_iter()
-            .map(Cow::Owned),
-    );
+    smaller_box.polygonize(&mut index, 0)?;
+    bigger_box.polygonize(&mut index, 0)?;
 
-    let smaller_box = index.save_mesh(smaller_box.into_iter().map(Cow::Owned));
-    let bigger_box_mut = index.get_mutable_mesh(bigger_box);
-
-    let result = bigger_box_mut.boolean_union(smaller_box).remove(0);
-
-    let filename = "bigger_by_smaller.stl";
-    let path = file_root.join(filename);
-    let mut writer = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(path)
-        .unwrap();
-
-    stl_io::write_stl(&mut writer, result.into_iter())?;
-    Ok(vec![filename.into()])
+    Ok(index.scad())
 }
+
+fn overlap_in_center(file_root: PathBuf) -> anyhow::Result<String> {
+    let mut index = GeoIndex::new(Aabb::from_points(&[
+        Vector3::new(Dec::from(-10), Dec::from(-10), Dec::from(-10)),
+        Vector3::new(Dec::from(15), Dec::from(14), Dec::from(10)),
+    ]))
+    .debug_svg_path(file_root.clone())
+    .input_polygon_min_rib_length(dec!(0.05))
+    .points_precision(dec!(0.001));
+
+    let zero = Origin::new();
+
+    let smaller_box = Rect::centered(zero.clone().offset_x(1), Dec::one(), Dec::one(), Dec::one());
+
+    let bigger_box = Rect::centered(zero, Dec::one() * 2, Dec::one() * 2, Dec::one() * 2);
+
+    let small = index.get_current_default_mesh();
+    smaller_box.polygonize(&mut index, 0)?;
+    let big = index.create_new_mesh_and_set_as_default();
+    bigger_box.polygonize(&mut index, 0)?;
+
+    let remove = [
+        index.select_polygons(
+            small,
+            big,
+            geometry::indexes::geo_index::index::PolygonFilter::Front,
+        ),
+        index.select_polygons(
+            big,
+            small,
+            geometry::indexes::geo_index::index::PolygonFilter::Back,
+        ),
+    ]
+    .concat();
+
+    for p in remove {
+        index.remove_polygon(p);
+    }
+
+    Ok(index.scad())
+}
+
+fn overlap_touching_edge(file_root: PathBuf) -> anyhow::Result<String> {
+    let mut index = GeoIndex::new(Aabb::from_points(&[
+        Vector3::new(Dec::from(-10), Dec::from(-10), Dec::from(-10)),
+        Vector3::new(Dec::from(15), Dec::from(14), Dec::from(10)),
+    ]))
+    .debug_svg_path(file_root.clone())
+    .input_polygon_min_rib_length(dec!(0.05))
+    .points_precision(dec!(0.001));
+
+    let zero = Origin::new();
+
+    let smaller_box = Rect::centered(
+        zero.clone().offset_x(1).offset_y(Dec::from(1) / 2),
+        Dec::one(),
+        Dec::one(),
+        Dec::one(),
+    );
+
+    let bigger_box = Rect::centered(zero, Dec::one() * 2, Dec::one() * 2, Dec::one() * 2);
+
+    let small = index.get_current_default_mesh();
+    smaller_box.polygonize(&mut index, 0)?;
+    let big = index.create_new_mesh_and_set_as_default();
+    bigger_box.polygonize(&mut index, 0)?;
+
+    let remove = [
+        index.select_polygons(
+            small,
+            big,
+            geometry::indexes::geo_index::index::PolygonFilter::Front,
+        ),
+        index.select_polygons(
+            big,
+            small,
+            geometry::indexes::geo_index::index::PolygonFilter::Back,
+        ),
+        index.select_polygons(
+            big,
+            small,
+            geometry::indexes::geo_index::index::PolygonFilter::Shared,
+        ),
+    ]
+    .concat();
+
+    for p in &remove {
+        index.remove_polygon(*p);
+    }
+
+    index.move_all_polygons(big, small);
+
+    Ok(index.scad())
+}
+
+fn overlap_touching_edge_with_opposite_polygons(file_root: PathBuf) -> anyhow::Result<String> {
+    let mut index = GeoIndex::new(Aabb::from_points(&[
+        Vector3::new(Dec::from(-10), Dec::from(-10), Dec::from(-10)),
+        Vector3::new(Dec::from(15), Dec::from(14), Dec::from(10)),
+    ]))
+    .debug_svg_path(file_root.clone())
+    .input_polygon_min_rib_length(dec!(0.05))
+    .points_precision(dec!(0.001));
+
+    let zero = Origin::new();
+
+    let smaller_box = Rect::build()
+        .origin(zero.clone().offset_z(-1))
+        .align_z(geometry::shapes::Align::Pos)
+        .build();
+
+    let cutter = Plane::centered(zero.clone().offset_z(0.9), 10, 10, 1);
+    let bigger_box = Rect::centered(zero, Dec::one() * 2, Dec::one() * 2, Dec::one() * 2);
+
+    //let small = index.get_current_default_mesh();
+    //smaller_box.polygonize(&mut index, 0)?;
+    let big = index.create_new_mesh_and_set_as_default();
+    bigger_box.polygonize(&mut index, 0)?;
+    let cut = index.create_new_mesh_and_set_as_default();
+    cutter.polygonize(&mut index, 0)?;
+    for p in [
+        index.get_mesh_polygon_ids(cut).collect_vec(),
+        index.select_polygons(big, cut, PolygonFilter::Front),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        index.remove_polygon(p)
+    }
+
+    let smal = index.create_new_mesh_and_set_as_default();
+    smaller_box.polygonize(&mut index, 0).unwrap();
+
+    //index.move_all_polygons(big, small);
+
+    Ok(index.scad())
+}
+
+fn complex_cut(file_root: PathBuf) -> anyhow::Result<String> {
+    let mut index = GeoIndex::new(Aabb::from_points(&[
+        Vector3::new(Dec::from(-10), Dec::from(-10), Dec::from(-10)),
+        Vector3::new(Dec::from(15), Dec::from(14), Dec::from(10)),
+    ]))
+    .debug_svg_path(file_root.clone())
+    .input_polygon_min_rib_length(dec!(0.05))
+    .points_precision(dec!(0.001));
+
+    let zero = Origin::new();
+
+    let platform = Rect::centered(zero.clone(), Dec::one(), Dec::one(), Dec::one() / 5);
+
+    let cutter = Rect::centered(
+        zero.clone().offset_x(0.2).offset_y(0.2),
+        Dec::one(),
+        Dec::one(),
+        Dec::one(),
+    );
+
+    let platform_mesh = index.get_current_default_mesh();
+    platform.polygonize(&mut index, 0)?;
+    let cutter_mesh = index.create_new_mesh_and_set_as_default();
+    cutter.polygonize(&mut index, 0)?;
+
+    let remove = [
+        index.select_polygons(
+            cutter_mesh,
+            platform_mesh,
+            geometry::indexes::geo_index::index::PolygonFilter::Front,
+        ),
+        index.select_polygons(
+            platform_mesh,
+            cutter_mesh,
+            geometry::indexes::geo_index::index::PolygonFilter::Back,
+        ),
+    ]
+    .concat();
+
+    for p in &remove {
+        index.remove_polygon(*p);
+    }
+
+    for p in index.get_mesh_polygon_ids(cutter_mesh).collect_vec() {
+        index.flip_polygon(p);
+    }
+
+    let matter = Rect::centered(
+        zero.offset_x(-0.95),
+        Dec::one(),
+        Dec::from(dec!(0.6)),
+        Dec::one() / 5,
+    );
+
+    index.move_all_polygons(cutter_mesh, platform_mesh);
+    let matter_mesh = index.create_new_mesh_and_set_as_default();
+
+    matter.polygonize(&mut index, 0)?;
+
+    let select_polygons_2 = [
+        index.select_polygons(
+            matter_mesh,
+            platform_mesh,
+            geometry::indexes::geo_index::index::PolygonFilter::Back,
+        ),
+        index.select_polygons(
+            platform_mesh,
+            matter_mesh,
+            geometry::indexes::geo_index::index::PolygonFilter::Back,
+        ),
+    ]
+    .concat();
+
+    for p in select_polygons_2 {
+        index.remove_polygon(p);
+    }
+    index.move_all_polygons(matter_mesh, platform_mesh);
+
+    Ok(index.scad())
+}
+
+fn apply_holes(
+    holes: &[&dyn GeometryDyn],
+    in_mesh: MeshId,
+    index: &mut GeoIndex,
+) -> anyhow::Result<()> {
+    for hole in holes {
+        let new_hole_id = index.create_new_mesh_and_set_as_default();
+        hole.polygonize(index, 0)?;
+
+        let to_delete = [
+            index.select_polygons(new_hole_id, in_mesh, PolygonFilter::Front),
+            index.select_polygons(in_mesh, new_hole_id, PolygonFilter::Back),
+        ]
+        .concat();
+        for p in to_delete {
+            index.remove_polygon(p);
+        }
+
+        for p in index
+            .get_mesh_polygon_ids(new_hole_id)
+            .collect::<HashSet<_>>()
+        {
+            index.flip_polygon(p);
+        }
+        index.move_all_polygons(new_hole_id, in_mesh);
+    }
+    Ok(())
+}
+
+fn some_interesting_mesh(index: &mut GeoIndex) -> anyhow::Result<MeshId> {
+    let zero = Origin::new();
+    let lock = index.create_new_mesh_and_set_as_default();
+
+    let rect = Rect::with_bottom_at(zero.clone().offset_z(1.3), 18.into(), 18.into(), 1.2.into());
+
+    for p in rect.render() {
+        index.save_as_polygon(&p, None)?;
+    }
+
+    let lock_min = Rect::with_bottom_at(
+        zero.clone(),
+        Dec::from(13.8),
+        Dec::from(13.8),
+        Dec::from(1.2) + Dec::from(1.3) + Dec::one(),
+    );
+
+    let holes = vec![lock_min]
+        .into_iter()
+        .map(|h| -> Box<dyn GeometryDyn> { Box::new(h) })
+        .collect_vec();
+
+    apply_holes(&holes.iter().map(|b| b.as_ref()).collect_vec(), lock, index)?;
+
+    Ok(lock)
+}
+
+fn some_other_interesting_mesh(index: &mut GeoIndex) -> anyhow::Result<MeshId> {
+    let zero = Origin::new();
+
+    let rect = Rect::with_top_at(
+        zero.clone(),
+        Dec::from(13.8) + Dec::from(dec!(0.7)),
+        Dec::from(13.8) + Dec::from(dec!(0.7)),
+        Dec::from(1.5),
+    );
+    for p in rect.render() {
+        index.save_as_polygon(&p, None)?;
+    }
+    let main_mesh = index.get_current_default_mesh();
+
+    let main_hole = Cylinder::with_top_at(
+        zero.clone().offset_z(dec!(0.5)),
+        Dec::from(1.5) + Dec::one(),
+        Dec::from(1.7),
+    )
+    .top_cap(false)
+    .bottom_cap(false)
+    .steps(32);
+
+    let right = Cylinder::with_top_at(
+        zero.clone().offset_z(dec!(0.5)).offset_x(5.5),
+        Dec::from(1.5) + Dec::one(),
+        Dec::from(0.95),
+    )
+    .steps(32)
+    .top_cap(false)
+    .bottom_cap(false);
+
+    let left = Cylinder::with_top_at(
+        zero.clone().offset_z(dec!(0.5)).offset_x(-5.5),
+        Dec::from(1.5) + Dec::one(),
+        Dec::from(0.95),
+    )
+    .steps(32)
+    .top_cap(false)
+    .bottom_cap(false);
+
+    let pin1 = Cylinder::with_top_at(
+        zero.clone().offset_z(dec!(0.5)).offset_x(5).offset_y(-3.8),
+        Dec::from(1.5) + Dec::one(),
+        Dec::from(1.5),
+    )
+    .steps(32)
+    .top_cap(false)
+    .bottom_cap(false);
+
+    let pin2 = Cylinder::with_top_at(
+        zero.clone().offset_z(dec!(0.5)).offset_y(dec!(-5.9)),
+        Dec::from(1.5) + Dec::one(),
+        Dec::from(1.5),
+    )
+    .steps(32)
+    .top_cap(false)
+    .bottom_cap(false);
+
+    let holes = vec![main_hole, left, right, pin1, pin2 /**/]
+        .into_iter()
+        .map(|h| -> Box<dyn GeometryDyn> { Box::new(h) })
+        .collect_vec();
+
+    apply_holes(
+        &holes.iter().map(|b| b.as_ref()).collect_vec(),
+        main_mesh,
+        index,
+    )?;
+
+    Ok(main_mesh)
+}
+
+fn glue_mesh_to_mesh(
+    one_mesh: MeshId,
+    other_mesh: MeshId,
+    index: &mut GeoIndex,
+) -> anyhow::Result<MeshId> {
+    let zero = Origin::new();
+    let glue_size_x = Dec::from(18);
+    let min = Dec::from(dec!(0.1));
+    let mmin = Dec::from(dec!(0.005));
+    let glue_size_y = (Dec::from(18) - Dec::from(13.8)) / 2;
+    let glue_size_z = Dec::from(2.2) + Dec::from(1.5);
+
+    let glue_mesh = Rect::with_bottom_at(
+        zero.offset_z(-Dec::from(1.5))
+            .offset_y(Dec::from(13.8) / 2)
+            .offset_y(glue_size_y / 2),
+        glue_size_x,
+        glue_size_y,
+        glue_size_z,
+    );
+    let glue_material = index.create_new_mesh_and_set_as_default();
+    dbg!(glue_material, other_mesh);
+
+    glue_mesh.polygonize(index, 0)?;
+
+    /*for pp in [6]
+                .into_iter()
+                .flat_map(|p| index.get_polygon_with_root_parent(PolyId(p)))
+                .collect::<HashSet<_>>()
+            {
+                println!("pp : {pp:?}");
+                index.remove_polygon(pp);
+            }
+
+    */
+
+    let to_delete = [
+        index.select_polygons(glue_material, one_mesh, PolygonFilter::Back),
+        index.select_polygons(glue_material, other_mesh, PolygonFilter::Back),
+        index.select_polygons(one_mesh, glue_material, PolygonFilter::Back),
+        index.select_polygons(other_mesh, glue_material, PolygonFilter::Back),
+    ]
+    .concat();
+
+    for p in to_delete {
+        println!("REMOVE--- {:?} ", p);
+
+        index.remove_polygon(p);
+    }
+
+    for pp in [854]
+        .into_iter()
+        .flat_map(|p| index.get_polygon_with_root_parent(PolyId(p)))
+        .collect::<HashSet<_>>()
+    {
+        println!("log pp : {pp:?}");
+        index.remove_polygon(pp);
+    }
+
+    //index.move_all_polygons(other_mesh, one_mesh);
+    //index.move_all_polygons(glue_material, one_mesh);
+
+    Ok(one_mesh)
+}
+
+fn glueing_two_meshes(file_root: PathBuf) -> anyhow::Result<String> {
+    let mut index = GeoIndex::new(Aabb::from_points(&[
+        Vector3::new(Dec::from(-10), Dec::from(-10), Dec::from(-10)),
+        Vector3::new(Dec::from(15), Dec::from(14), Dec::from(10)),
+    ]))
+    .debug_svg_path(file_root.clone())
+    .input_polygon_min_rib_length(dec!(0.05))
+    .points_precision(dec!(0.001));
+
+    index.poly_split_debug(
+        PolyId(175),
+        PolygonBasis {
+            center: Vector3::zeros(),
+            x: Vector3::x(),
+            y: Vector3::y(),
+        },
+    );
+
+    let lock = some_interesting_mesh(&mut index)?;
+    let bed = some_other_interesting_mesh(&mut index)?;
+
+    let part = glue_mesh_to_mesh(lock, bed, &mut index)?;
+
+    Ok(index.scad())
+}
+
+/*
 
 fn smaller_by_bigger(file_root: PathBuf) -> anyhow::Result<Vec<String>> {
     let mut index = GeoIndex::new();
@@ -685,13 +1114,19 @@ fn smaller_box_cutted_by_bigger_in_two(file_root: PathBuf) -> anyhow::Result<Vec
 */
 
 fn main() -> Result<(), anyhow::Error> {
-    /*
     let cli = Command::parse();
 
     fs::create_dir_all(cli.output_path.clone())?;
-    let paths = vec![
+    let meshes = [
         /*
         bigger_by_smaller(cli.output_path.clone())?,
+        overlap_in_center(cli.output_path.clone())?,
+        overlap_touching_edge(cli.output_path.clone())?,
+         */
+        overlap_touching_edge_with_opposite_polygons(cli.output_path.clone())?,
+        /*
+        complex_cut(cli.output_path.clone())?,
+        glueing_two_meshes(cli.output_path.clone())?,
         smaller_by_bigger(cli.output_path.clone())?,
         two_identical_boxes_one_with_one_common_side(cli.output_path.clone())?,
         two_identical_boxes_one_with_overlap(cli.output_path.clone())?,
@@ -705,10 +1140,7 @@ fn main() -> Result<(), anyhow::Error> {
         smaller_box_cutted_by_bigger_in_two(cli.output_path.clone())?,
         smaller_box_cutted_by_longer(cli.output_path.clone())?,
          */
-        /*
-         */
-    ]
-    .concat();
+    ];
 
     let grid: i32 = 4;
     let grid_size = 3.0;
@@ -718,11 +1150,8 @@ fn main() -> Result<(), anyhow::Error> {
         for h in 0..grid {
             let y = grid_size * (h as f32 - (grid as f32 / 2.0));
             let i = h + (w * grid);
-            if let Some(path) = paths.get(i as usize) {
-                scad.push(format!(
-                    "translate(v=[{}, {}, 0]) {{ import(\"{}\"); }}",
-                    x, y, path
-                ));
+            if let Some(mesh) = meshes.get(i as usize) {
+                scad.push(format!("translate(v=[{}, {}, 0]) {{ {} }};", x, y, mesh));
             } else {
                 break 'outer;
             }
@@ -733,6 +1162,5 @@ fn main() -> Result<(), anyhow::Error> {
 
     fs::write(cli.output_path.join("tot.scad"), file_content).unwrap();
 
-    */
     Ok(())
 }

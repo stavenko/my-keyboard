@@ -1,8 +1,12 @@
-use std::{collections::HashSet, fmt};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::{self, format},
+    path::Path,
+};
 
 use itertools::Itertools;
 use nalgebra::{Vector2, Vector3};
-use num_traits::Zero;
+use num_traits::{Bounded, Zero};
 use rand::Rng;
 use rstar::{Point, RTreeObject, AABB};
 use stl_io::{Triangle, Vector};
@@ -126,27 +130,89 @@ impl<'a> PolyRef<'a> {
         items.join("\n")
     }
 
-    pub(crate) fn triangles(&self) -> anyhow::Result<Vec<Triangle>> {
-        /*
-        if self.get_segments().count() == 3 {
-            let vs = self.index.get_polygon_vertices(self.poly_id);
-            let triangle = Triangle {
-                normal: Vector::new([
-                    self.get_plane().normal().x.into(),
-                    self.get_plane().normal().y.into(),
-                    self.get_plane().normal().x.into(),
-                ]),
-                vertices: vs
-                    .into_iter()
-                    .map(|v| Vector::new([v.x.into(), v.y.into(), v.z.into()]))
-                    .collect_vec()
-                    .try_into()
-                    .expect("ok"),
-            };
+    pub fn svg_debug_fill(&self, basis: &PolygonBasis, fill: &str) -> String {
+        let mut items = Vec::new();
+        let mut points = Vec::new();
+        let colors = ["red", "green", "blue", "orange", "purple"];
+        let mut path = Vec::new();
 
-            return Ok(vec![triangle]);
+        let mut aabb = Vec::new();
+        let mut min_distance_betnween_points = <Dec as Bounded>::max_value();
+
+        for seg in self.segments_iter() {
+            let pt = seg.from_pt();
+            let to_pt = seg.to_pt();
+            let v = self.index.vertices.get_point(pt);
+            let to = self.index.vertices.get_point(to_pt);
+            let v2 = basis.project_on_plane_z(&v) * Dec::from(1000);
+            let to_v2 = basis.project_on_plane_z(&to) * Dec::from(1000);
+            let d = (to_v2 - v2).magnitude();
+            min_distance_betnween_points = min_distance_betnween_points.min(d);
+            //let vv = basis.project_on_plane_z(v);
+            let v3 = Vector3::new(v2.x, v2.y, Dec::zero());
+            aabb.push(v3);
         }
-        */
+
+        let aabb = Aabb::from_points(&aabb);
+        let mut width = aabb.max.x - aabb.min.x;
+        let mut height = aabb.max.y - aabb.min.y;
+        let circle_size: Dec = min_distance_betnween_points * 4;
+        let top = aabb.min.y - (circle_size / Dec::from(2));
+        let left = aabb.min.x - (circle_size / Dec::from(2));
+        width += circle_size * 2;
+        height += circle_size * 2;
+        let aspect = width / height;
+        let img_width = Dec::from(800);
+        let img_height = img_width / aspect;
+        let font = (circle_size * Dec::from(0.7)).round_dp(1);
+        dbg!(circle_size);
+
+        items.push(format!("<svg viewBox=\" {left} {top} {width} {height}\" xmlns=\"http://www.w3.org/2000/svg\" width=\"{img_width}\" height=\"{img_height}\">"));
+        items.push(format!(
+            "<style> text{{ font: italic {font}pt sans-serif; }} </style>"
+        ));
+        for (ix, pt) in self.segments_iter().map(|s| s.from_pt()).enumerate() {
+            let v = self.index.vertices.get_point(pt);
+            let v2 = basis.project_on_plane_z(&v) * Dec::from(1000);
+            points.push(format!(
+                "<circle cx=\"{}\" cy=\"{}\" r=\"{circle_size}\" fill=\"{}\"/> <text x=\"{}\" y=\"{}\" text-anchor=\"middle\" >{pt} </text>
+                ",
+                v2.x.round_dp(9),
+                v2.y.round_dp(9),
+                colors[ix % colors.len()],
+                v2.x.round_dp(9),
+                v2.y.round_dp(9),
+            ));
+
+            if ix == 0 {
+                path.push(format!("M {} {}", v2.x.round_dp(9), v2.y.round_dp(9)));
+            } else {
+                path.push(format!("L {} {}", v2.x.round_dp(9), v2.y.round_dp(9)));
+            }
+        }
+        path.push("z".to_string());
+        let c = colors[rand::thread_rng().gen_range(0..colors.len())];
+
+        items.push(format!(
+            "<path stroke=\"{}\" fill=\"{fill}\" stroke-width=\"0.0\" d = \"{}\" />",
+            c,
+            path.join(" ")
+        ));
+        items.extend(points);
+        items.push("</svg>".to_string());
+        items.join("\n")
+    }
+
+    pub(crate) fn serialized_polygon_pt(&self) -> String {
+        let mut collect_vec = self
+            .segments_iter()
+            .map(|seg| format!("{}", seg.from_pt()))
+            .collect_vec();
+        collect_vec.reverse();
+        collect_vec.join(", ")
+    }
+
+    pub(crate) fn triangles(&self) -> anyhow::Result<Vec<Triangle>> {
         let basis = self.calculate_polygon_basis();
         let mut index = Vec::new();
 
@@ -183,38 +249,26 @@ impl<'a> PolyRef<'a> {
 
         while !t.done() {
             t.step().tap_err(|e| {
-                let vertices = self
-                    .segments_2d_iter(&basis)
-                    .map(|s| s.from * Dec::from(10))
-                    .collect_vec();
-                let svg = self.svg_debug(vertices);
-
-                /*
-                if let Some((parent_id, parent_segments)) = self
+                println!("basis {basis:?}");
+                let mut parents = self
                     .index
-                    .polygon_parent
-                    .get(&self.poly_id)
-                    .and_then(|p| self.index.deleted_polygons.get(p).map(|ps| (p, ps)))
-                {
-                    let vertices = parent_segments
-                        .segments
-                        .iter()
-                        .map(|s| Segment2D {
-                            from: basis.project_on_plane_z(
-                                &self.index.vertices.get_point(s.from(&self.index.ribs)),
-                            ),
-                            to: basis.project_on_plane_z(
-                                &self.index.vertices.get_point(s.to(&self.index.ribs)),
-                            ),
-                        })
-                        .map(|s| s.from * Dec::from(10))
-                        .collect_vec();
-                    let svg = self.svg_debug(vertices);
-                    print!("PARENT {parent_id:?}: \n\n{svg}\n\n");
-                }
-                */
+                    .polygon_splits
+                    .iter()
+                    .flat_map(|(parent, children)| {
+                        children.clone().into_iter().map(|child| (child, *parent))
+                    })
+                    .collect::<HashMap<_, _>>();
 
-                println!("\n\n{svg}\n\n{:?}~~~", self.poly_id);
+                let mut chain = vec![self.poly_id];
+                while let Some(parent) = parents.remove(chain.last().expect("ok")) {
+                    chain.push(parent);
+                }
+                chain.reverse();
+                println!(
+                    "chain: {}",
+                    chain.into_iter().map(|p| format!("{p:?}")).join(" > ")
+                );
+
                 panic!("{e}");
             })?;
         }

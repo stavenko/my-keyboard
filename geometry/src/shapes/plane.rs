@@ -3,7 +3,7 @@ use nalgebra::{ClosedAdd, SimdRealField, Vector3};
 use num_traits::Zero;
 
 use crate::{
-    origin::{self, BaseOrigin},
+    decimal::Dec, geometry::GeometryDyn, indexes::geo_index::index, origin::BaseOrigin,
     parametric_iterator::ParametricIterator,
 };
 
@@ -22,31 +22,60 @@ where
     F: From<usize>,
     F: From<u16>,
 {
-    pub fn centered(origin: BaseOrigin<F>, width: F, height: F, resolution: usize) -> Self {
+    pub fn centered(
+        origin: BaseOrigin<F>,
+        width: impl Into<F>,
+        height: impl Into<F>,
+        resolution: usize,
+    ) -> Self {
         Self {
             origin,
-            width,
-            height,
+            width: width.into(),
+            height: height.into(),
             resolution,
         }
     }
 
-    pub fn render(self) -> Vec<Vec<Vector3<F>>> {
-        let wf = self.origin.center - self.origin.x() * self.width / F::from(2u16);
-        let hf = self.origin.center - self.origin.y() * self.height / F::from(2u16);
-        let wt = wf + self.origin.x() * self.width;
-        let ht = hf + self.origin.y() * self.height;
+    pub fn render(&self) -> Vec<Vec<Vector3<F>>> {
+        let wf = self.origin.center
+            - self.origin.x() * self.width / F::from(2u16)
+            - self.origin.y() * self.height / F::from(2u16);
 
-        ParametricIterator::new(self.resolution)
+        ParametricIterator::<F>::new(self.resolution)
             .flat_map(|(s, ss)| {
-                ParametricIterator::new(self.resolution).map(move |(t, tt)| {
-                    let a = wf.lerp(&wt, s);
-                    let b = wf.lerp(&wt, ss);
-                    let c = hf.lerp(&ht, tt);
-                    let d = hf.lerp(&ht, t);
+                ParametricIterator::<F>::new(self.resolution).map(move |(t, tt)| {
+                    let ws: Vector3<F> = self.origin.x() * self.width * s;
+                    let wss: Vector3<F> = self.origin.x() * self.width * ss;
+
+                    let ht: Vector3<F> = self.origin.y() * self.width * t;
+                    let htt: Vector3<F> = self.origin.y() * self.width * tt;
+                    let a = wf + ws + ht;
+                    let b = wf + wss + ht;
+                    let c = wf + wss + htt;
+                    let d = wf + ws + htt;
+                    dbg!(a, b, c, d);
                     vec![a, b, c, d]
                 })
             })
             .collect_vec()
+    }
+}
+
+impl<F> GeometryDyn for Plane<F>
+where
+    F: Into<Dec>
+        + nalgebra::Scalar
+        + nalgebra::Field
+        + nalgebra::RealField
+        + Copy
+        + From<usize>
+        + From<u16>,
+{
+    fn polygonize(&self, index: &mut index::GeoIndex, _complexity: usize) -> anyhow::Result<()> {
+        for p in self.render() {
+            index.save_as_polygon(&p, None)?;
+        }
+
+        Ok(())
     }
 }
