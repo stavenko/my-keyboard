@@ -5,6 +5,7 @@ use geometry::{
         hyper_line::HyperLine, hyper_point::SuperPoint,
         hyper_surface::simple_dynamic_surface::SimpleSurface,
     },
+    indexes::geo_index::mesh::MeshRefMut,
     origin::Origin,
 };
 
@@ -202,11 +203,7 @@ impl ButtonsColumn {
         })
     }
 
-    pub(crate) fn filler_inner(
-        &self,
-        index: &mut geometry::indexes::geo_index::index::GeoIndex,
-        thickness: Dec,
-    ) -> anyhow::Result<()> {
+    pub(crate) fn filler_inner(&self, mesh: &mut MeshRefMut, thickness: Dec) -> anyhow::Result<()> {
         for s in self.buttons().next_and_peek(move |p, n| {
             let top_btn_hl = HyperLine::new_2(
                 SuperPoint {
@@ -230,16 +227,12 @@ impl ButtonsColumn {
             );
             SimpleSurface::new(bottom_btn_hl, top_btn_hl)
         }) {
-            s.polygonize(index, 1)?;
+            s.polygonize(mesh, 1)?;
         }
         Ok(())
     }
 
-    pub(crate) fn filler_outer(
-        &self,
-        index: &mut geometry::indexes::geo_index::index::GeoIndex,
-        thickness: Dec,
-    ) -> anyhow::Result<()> {
+    pub(crate) fn filler_outer(&self, mesh: &mut MeshRefMut, thickness: Dec) -> anyhow::Result<()> {
         for s in self.buttons().next_and_peek(move |p, n| {
             let top_btn_hl = HyperLine::new_2(
                 SuperPoint {
@@ -263,7 +256,7 @@ impl ButtonsColumn {
             );
             SimpleSurface::new(top_btn_hl, bottom_btn_hl)
         }) {
-            s.polygonize(index, 1)?;
+            s.polygonize(mesh, 1)?;
         }
         Ok(())
     }

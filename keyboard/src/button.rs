@@ -1,8 +1,16 @@
-use geometry::{decimal::Dec, origin::Origin};
+use geometry::{
+    decimal::Dec,
+    indexes::geo_index::{
+        geo_object::GeoObject,
+        index::GeoIndex,
+        mesh::{MeshId, MeshRefMut},
+    },
+    origin::Origin,
+};
 use nalgebra::Vector3;
 use rust_decimal_macros::dec;
 
-use crate::button_builder::ButtonBuilder;
+use crate::{button_builder::ButtonBuilder, chok_hotswap::ChokHotswap};
 
 #[derive(Clone, Debug, Default)]
 #[allow(unused)]
@@ -21,6 +29,7 @@ pub enum ButtonMountKind {
     Chok,
     Cherry,
     Placeholder,
+    ChokHotswapCustom,
 }
 
 impl ButtonMountKind {
@@ -35,6 +44,10 @@ impl ButtonMountKind {
                 let ps = self.params();
                 ps.width
             }
+            ButtonMountKind::ChokHotswapCustom => {
+                let a = ChokHotswap::new();
+                a.width()
+            }
         }
     }
 
@@ -48,6 +61,10 @@ impl ButtonMountKind {
             ButtonMountKind::Placeholder => {
                 let ps = self.params();
                 ps.height
+            }
+            ButtonMountKind::ChokHotswapCustom => {
+                let a = ChokHotswap::new();
+                a.height()
             }
         }
     }
@@ -71,6 +88,7 @@ impl ButtonMountKind {
                 ..Default::default()
             },
             ButtonMountKind::Cherry => todo!(),
+            ButtonMountKind::ChokHotswapCustom => unreachable!(),
         }
     }
 }
@@ -94,6 +112,9 @@ pub struct Button {
 impl Button {
     pub fn chok() -> ButtonBuilder {
         ButtonBuilder::chok()
+    }
+    pub fn chok_hotswap_custom() -> ButtonBuilder {
+        ButtonBuilder::chok_hotswap_custom()
     }
 
     pub fn placeholder() -> ButtonBuilder {
@@ -176,13 +197,10 @@ impl Button {
         self.origin.center + self.origin.x() * v.x + self.origin.y() * v.y + self.origin.z() * v.z
     }
 
-    pub(crate) fn mesh(
-        &self,
-        index: &mut geometry::indexes::geo_index::index::GeoIndex,
-        thickness: Dec,
-    ) -> anyhow::Result<()> {
+    pub(crate) fn mesh(&self, index: &mut GeoIndex, thickness: Dec) -> anyhow::Result<MeshId> {
         match self.kind {
             ButtonMountKind::Placeholder => {
+                let mesh_id = index.new_mesh();
                 let top = [
                     self.outer_left_top(thickness),
                     self.outer_left_bottom(thickness),
@@ -196,10 +214,14 @@ impl Button {
                     self.inner_left_top(thickness),
                 ];
 
-                index.save_as_polygon(&top, None)?;
-                index.save_as_polygon(&bottom, None)?;
+                let mut mesh = mesh_id.make_mut_ref(index);
+                mesh.add_polygon(&top)?;
+                mesh.add_polygon(&bottom)?;
+                Ok(mesh_id)
             }
             ButtonMountKind::Chok => {
+                let mesh_id = index.new_mesh();
+                let mut mesh = mesh_id.make_mut_ref(index);
                 let ps = self.kind.params();
                 let outer_btn_width = ps.width + ps.around_button_padding;
                 let outer_btn_height = ps.height + ps.around_button_padding;
@@ -274,14 +296,14 @@ impl Button {
                 ];
                 tt.reverse();
 
-                index.save_as_polygon(&top_pl1, None)?;
-                index.save_as_polygon(&top_pl2, None)?;
-                index.save_as_polygon(&top_pl3, None)?;
-                index.save_as_polygon(&top_pl4, None)?;
-                index.save_as_polygon(&tr, None)?;
-                index.save_as_polygon(&tl, None)?;
-                index.save_as_polygon(&tb, None)?;
-                index.save_as_polygon(&tt, None)?;
+                mesh.add_polygon(&top_pl1)?;
+                mesh.add_polygon(&top_pl2)?;
+                mesh.add_polygon(&top_pl3)?;
+                mesh.add_polygon(&top_pl4)?;
+                mesh.add_polygon(&tr)?;
+                mesh.add_polygon(&tl)?;
+                mesh.add_polygon(&tb)?;
+                mesh.add_polygon(&tt)?;
 
                 let inner_btn_width = ps.width + ps.around_button_padding;
                 let inner_btn_height = ps.height + ps.around_button_padding;
@@ -372,19 +394,27 @@ impl Button {
                     self.pt(Vector3::new(ps.lock_width / 2, ps.lock_height / 2, thickness / 2 - ps.lock_depth)),
                 ];
 
-                index.save_as_polygon(&bot_pl1, None)?;
-                index.save_as_polygon(&bot_pl2, None)?;
-                index.save_as_polygon(&bot_pl3, None)?;
-                index.save_as_polygon(&bot_pl4, None)?;
+                mesh.add_polygon(&bot_pl1)?;
+                mesh.add_polygon(&bot_pl2)?;
+                mesh.add_polygon(&bot_pl3)?;
+                mesh.add_polygon(&bot_pl4)?;
 
-                index.save_as_polygon(&bot2_pl, None)?;
-                index.save_as_polygon(&br, None)?;
-                index.save_as_polygon(&bl, None)?;
-                index.save_as_polygon(&bb, None)?;
-                index.save_as_polygon(&bt, None)?;
+                mesh.add_polygon(&bot2_pl)?;
+                mesh.add_polygon(&br)?;
+                mesh.add_polygon(&bl)?;
+                mesh.add_polygon(&bb)?;
+                mesh.add_polygon(&bt)?;
+                Ok(mesh_id)
+            }
+
+            ButtonMountKind::ChokHotswapCustom => {
+                let mount = ChokHotswap::new();
+                println!("!!!");
+
+                mount.outer_mount(self.origin.clone(), index)
+                //Ok(index.new_mesh())
             }
             _ => todo!("Implement mesh for chok and cherry"),
         }
-        Ok(())
     }
 }

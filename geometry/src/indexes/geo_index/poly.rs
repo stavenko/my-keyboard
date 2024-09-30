@@ -1,105 +1,39 @@
 use std::{
     collections::{HashMap, HashSet},
-    fmt::{self, format},
-    path::Path,
+    fmt,
 };
 
 use itertools::Itertools;
 use nalgebra::{Vector2, Vector3};
 use num_traits::{Bounded, Zero};
 use rand::Rng;
-use rstar::{Point, RTreeObject, AABB};
-use stl_io::{Triangle, Vector};
-use tap::TapFallible;
 
 use crate::{
-    decimal::Dec,
-    indexes::{aabb::Aabb, vertex_index::PtId},
-    linear::segment2d::Segment2D,
-    planar::plane::Plane,
+    decimal::Dec, indexes::aabb::Aabb, linear::segment2d::Segment2D, planar::plane::Plane,
     polygon_basis::PolygonBasis,
-    primitives::Face,
 };
 
 use super::{
+    face::{Face, FaceId},
+    geo_object::{GeoObject, UnRef},
     index::GeoIndex,
-    seg::{Seg, SegRef},
+    mesh::MeshId,
+    seg::{SegRef, SegmentDir},
 };
 
-#[derive(Debug, PartialEq)]
-pub enum Side {
-    Front,
-    Back,
+#[derive(PartialEq, Eq, Clone, Debug, Hash, Copy)]
+pub struct UnrefPoly {
+    pub(super) mesh_id: MeshId,
+    pub(super) poly_id: PolyId,
 }
-
-#[derive(Debug)]
-pub struct PolygonSplitMeta {
-    pub by_plane: Plane,
-    pub other: PolyId,
-    pub side: Side,
-}
-
-impl From<Aabb> for AABB<RtreePt> {
-    fn from(value: Aabb) -> Self {
-        let p1 = value.min;
-        let p2 = value.max;
-        AABB::from_corners(p1.into(), p2.into())
-    }
-}
-
-impl From<Vector3<Dec>> for RtreePt {
-    fn from(value: Vector3<Dec>) -> Self {
-        Self([value.x, value.y, value.z])
-    }
-}
-
-impl Point for RtreePt {
-    type Scalar = Dec;
-
-    const DIMENSIONS: usize = 3;
-
-    fn generate(mut generator: impl FnMut(usize) -> Self::Scalar) -> Self {
-        RtreePt([generator(0), generator(1), generator(2)])
-    }
-
-    fn nth(&self, index: usize) -> Self::Scalar {
-        self.0[index]
-    }
-
-    fn nth_mut(&mut self, index: usize) -> &mut Self::Scalar {
-        &mut self.0[index]
-    }
-}
-
-impl RTreeObject for PolyRtreeRecord {
-    type Envelope = AABB<RtreePt>;
-
-    fn envelope(&self) -> Self::Envelope {
-        self.1.into()
-    }
-}
-#[derive(Clone, PartialEq, Debug)]
-pub struct RtreePt([Dec; 3]);
-#[derive(Debug, PartialEq)]
-pub struct PolyRtreeRecord(pub(super) PolyId, pub(super) Aabb);
 
 impl<'a> PolyRef<'a> {
-    pub(crate) fn get_plane(&self) -> Plane {
-        self.index.polygons[&self.poly_id].plane.to_owned()
+    pub fn segments(&self) -> impl Iterator<Item = SegRef<'a>> + 'a {
+        let poly = self.polygon();
+        let face = self.index.load_face_ref(poly.face_id());
+        face.segments(poly.dir())
     }
 
-    pub(crate) fn segments_iter(&self) -> impl Iterator<Item = SegRef<'a>> + 'a {
-        self.index
-            .polygons
-            .get(&self.poly_id)
-            .into_iter()
-            .flat_map(|p| &p.segments)
-            .map(|&Seg { rib_id, dir }| SegRef {
-                rib_id,
-                dir,
-                index: self.index,
-            })
-    }
     pub fn svg_debug(&self, vertices: Vec<Vector2<Dec>>) -> String {
         let mut items = Vec::new();
         let colors = ["red", "green", "blue", "orange", "purple"];
@@ -139,7 +73,7 @@ impl<'a> PolyRef<'a> {
         let mut aabb = Vec::new();
         let mut min_distance_betnween_points = <Dec as Bounded>::max_value();
 
-        for seg in self.segments_iter() {
+        for seg in self.segments() {
             let pt = seg.from_pt();
             let to_pt = seg.to_pt();
             let v = self.index.vertices.get_point(pt);
@@ -171,7 +105,7 @@ impl<'a> PolyRef<'a> {
         items.push(format!(
             "<style> text{{ font: italic {font}pt sans-serif; }} </style>"
         ));
-        for (ix, pt) in self.segments_iter().map(|s| s.from_pt()).enumerate() {
+        for (ix, pt) in self.segments().map(|s| s.from_pt()).enumerate() {
             let v = self.index.vertices.get_point(pt);
             let v2 = basis.project_on_plane_z(&v) * Dec::from(1000);
             points.push(format!(
@@ -205,13 +139,14 @@ impl<'a> PolyRef<'a> {
 
     pub(crate) fn serialized_polygon_pt(&self) -> String {
         let mut collect_vec = self
-            .segments_iter()
+            .segments()
             .map(|seg| format!("{}", seg.from_pt()))
             .collect_vec();
         collect_vec.reverse();
         collect_vec.join(", ")
     }
 
+    /*
     pub(crate) fn triangles(&self) -> anyhow::Result<Vec<Triangle>> {
         let basis = self.calculate_polygon_basis();
         let mut index = Vec::new();
@@ -326,6 +261,7 @@ impl<'a> PolyRef<'a> {
             y: plane_y,
         }
     }
+    */
 
     pub(crate) fn segments_2d_iter<'s>(
         &'s self,
@@ -334,7 +270,7 @@ impl<'a> PolyRef<'a> {
     where
         's: 'a,
     {
-        self.segments_iter().map(|s| Segment2D {
+        self.segments().map(|s| Segment2D {
             from: basis.project_on_plane_z(&s.from()),
             to: basis.project_on_plane_z(&s.to()),
         })
@@ -344,56 +280,278 @@ impl<'a> PolyRef<'a> {
         self.index.vertices.get_point(v)
     }
 
-    pub fn get_segments<'b>(&'b self) -> impl Iterator<Item = SegRef<'a>> + 'a {
-        self.index
-            .polygons
-            .get(&self.poly_id)
-            .into_iter()
-            .flat_map(|p| &p.segments)
-            .map(|s| SegRef {
-                rib_id: s.rib_id,
-                dir: s.dir,
-                index: self.index,
-            })
-    }
-
-    pub(crate) fn points(&self) -> HashSet<PtId> {
-        self.index.get_polygon_points(self.poly_id)
-    }
-
-    pub(crate) fn has_chain(&self, chain: &[Seg]) -> bool {
-        let mut segs = self.index.polygons[&self.poly_id].segments.clone();
-        if let Some(ix) = segs.iter().position(|seg| seg == chain.first().unwrap()) {
-            segs.rotate_left(ix);
-            for i in 0..chain.len() {
-                if segs[i] != chain[i] {
-                    return false;
-                }
-            }
-            return true;
+    pub(crate) fn plane(&self) -> Plane {
+        match self.dir() {
+            SegmentDir::Fow => self.polygon().face().plane().to_owned(),
+            SegmentDir::Rev => self.polygon().face().plane().to_owned().flipped(),
         }
-        false
+    }
+
+    pub(crate) fn aabb(&self) -> &Aabb {
+        self.face().aabb()
+    }
+
+    fn polygon(&self) -> PolyRef {
+        self.index.load_polygon_ref(self.mesh_id, self.poly_id)
+    }
+
+    fn face(&self) -> &Face {
+        let face_id = self.polygon().face_id();
+        &self.index.faces[&face_id]
+    }
+
+    fn print_debug(&self) -> String {
+        self.segments()
+            .map(|s| {
+                let f = s.from();
+                let t = s.to();
+                format!("{} {} {} -> {} {} {}", f.x, f.y, f.z, t.x, t.y, t.z)
+            })
+            .join("\n")
+    }
+
+    pub fn face_id(&self) -> FaceId {
+        self.index.meshes[&self.mesh_id].polies[&self.poly_id].face_id
+    }
+
+    pub(crate) fn make_mut(self, index: &'a mut GeoIndex) -> PolyRefMut<'a> {
+        PolyRefMut {
+            poly_id: self.poly_id,
+            mesh_id: self.mesh_id,
+            index,
+        }
+    }
+
+    pub fn dir(&self) -> SegmentDir {
+        self.index.meshes[&self.mesh_id].polies[&self.poly_id].dir
+    }
+
+    pub fn poly_id(&self) -> PolyId {
+        self.poly_id
+    }
+
+    pub fn mesh_id(&self) -> MeshId {
+        self.mesh_id
+    }
+
+    pub(crate) fn normal(&self) -> Vector3<Dec> {
+        self.plane().normal()
     }
 }
 
+#[derive(Clone)]
 pub struct PolyRef<'a> {
     pub(super) poly_id: PolyId,
+    pub(super) mesh_id: MeshId,
     pub(super) index: &'a GeoIndex,
+}
+
+impl<'a> UnRef<'a> for PolyRef<'a> {
+    type Obj = UnrefPoly;
+
+    fn un_ref(self) -> Self::Obj {
+        UnrefPoly {
+            mesh_id: self.mesh_id,
+            poly_id: self.poly_id,
+        }
+    }
+}
+
+impl<'a> UnRef<'a> for PolyRefMut<'a> {
+    type Obj = UnrefPoly;
+
+    fn un_ref(self) -> Self::Obj {
+        UnrefPoly {
+            mesh_id: self.mesh_id,
+            poly_id: self.poly_id,
+        }
+    }
+}
+
+impl<'a> GeoObject<'a> for UnrefPoly {
+    type Ref = PolyRef<'a>;
+
+    type MutRef = PolyRefMut<'a>;
+
+    fn make_ref(&self, index: &'a GeoIndex) -> Self::Ref {
+        PolyRef {
+            poly_id: self.poly_id,
+            mesh_id: self.mesh_id,
+            index,
+        }
+    }
+
+    fn make_mut_ref(&self, index: &'a mut GeoIndex) -> Self::MutRef {
+        PolyRefMut {
+            poly_id: self.poly_id,
+            mesh_id: self.mesh_id,
+            index,
+        }
+    }
+}
+
+pub struct PolyRefMut<'a> {
+    pub(super) poly_id: PolyId,
+    pub(super) mesh_id: MeshId,
+    pub(super) index: &'a mut GeoIndex,
+}
+impl<'a> PolyRefMut<'a> {
+    pub(crate) fn change_face(&mut self, face_id: FaceId) {
+        if let Some(p) = self
+            .index
+            .meshes
+            .get_mut(&self.mesh_id)
+            .and_then(|m| m.polies.get_mut(&self.poly_id))
+        {
+            p.face_id = face_id;
+        }
+    }
+    pub(crate) fn replace(&mut self, replacement: Vec<Poly>) {
+        let poly_ix = self.poly_id;
+        if let Some(mesh) = self.index.meshes.get_mut(&self.mesh_id) {
+            mesh.polies.remove(&poly_ix);
+            for p in replacement {
+                mesh.add(p);
+            }
+        }
+    }
+
+    pub fn remove(&mut self) {
+        self.index.remove_polygon(self.poly_id, self.mesh_id)
+    }
+
+    pub fn flip(&mut self) {
+        if let Some(poly) = self
+            .index
+            .meshes
+            .get_mut(&self.mesh_id)
+            .and_then(|m| m.polies.get_mut(&self.poly_id))
+        {
+            poly.flip()
+        }
+    }
 }
 
 impl<'a> fmt::Debug for PolyRef<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.index.print_debug_polygon(self.poly_id))
+        write!(f, "{}", self.print_debug())
     }
 }
 
+/*
 #[derive(Debug, Clone)]
 pub struct Poly {
-    pub(super) segments: Vec<Seg>,
-    pub(super) plane: Plane,
-    pub(super) aabb: Aabb,
+    segments: Vec<Seg>,
+    plane: Plane,
+    aabb: Aabb,
 }
 
+*/
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct Poly {
+    pub(crate) face_id: FaceId,
+    pub(crate) dir: SegmentDir,
+}
+
+impl Poly {
+    pub(crate) fn fow(face_id: FaceId) -> Self {
+        Self {
+            face_id,
+            dir: SegmentDir::Fow,
+        }
+    }
+
+    pub(crate) fn rev(face_id: FaceId) -> Self {
+        Self {
+            face_id,
+            dir: SegmentDir::Rev,
+        }
+    }
+
+    fn flip(&mut self) {
+        self.dir = self.dir.flip();
+    }
+}
+
+/*
+impl Poly {
+    pub(crate) fn create(segments: Vec<Seg>, plane: Plane, aabb: Aabb) -> Self {
+        Self {
+            segments,
+            plane,
+            aabb,
+        }
+    }
+
+    pub(crate) fn plane(&self) -> &Plane {
+        &self.plane
+    }
+
+    pub(crate) fn aabb(&self) -> &Aabb {
+        &self.aabb
+    }
+
+    pub(crate) fn replace_segments(
+        &mut self,
+        replacing_segment_ix: usize,
+        replacement: impl IntoIterator<Item = Seg>,
+    ) {
+        self.segments.splice(
+            replacing_segment_ix..(replacing_segment_ix + 1),
+            replacement,
+        );
+    }
+
+    pub(crate) fn update_rib_index(
+        &self,
+        my_id: PolyId,
+        rib_index: &mut HashMap<RibId, Vec<PolyId>>,
+    ) {
+        for s in &self.segments {
+            GeoIndex::save_index(rib_index, s.rib_id, my_id);
+        }
+    }
+
+    pub(crate) fn delete_me_from_rib_index(
+        &self,
+        my_id: PolyId,
+        rib_index: &mut HashMap<RibId, Vec<PolyId>>,
+    ) {
+        for s in &self.segments {
+            GeoIndex::remove_item_from_index(rib_index, &s.rib_id, &my_id);
+        }
+    }
+
+    pub(crate) fn flip(&mut self) {
+        for s in self.segments.iter_mut() {
+            *s = s.flip();
+        }
+        self.segments.reverse();
+
+        self.plane.flip()
+    }
+
+    pub(crate) fn is_same_face(&self, other: &Poly) -> bool {
+        let len_is_same = self.segments.len() == other.segments.len();
+        if self.segments.is_empty() && len_is_same {
+            return true;
+        }
+        let mut straight = other.segments.clone();
+        let mut opposite = straight.iter().map(|s| s.flip()).rev().collect_vec();
+
+        if let Some(other_ix) = straight.iter().position(|s| *s == self.segments[0]) {
+            straight.rotate_left(other_ix);
+
+            straight == self.segments
+        } else if let Some(other_ix) = opposite.iter().position(|s| *s == self.segments[0]) {
+            opposite.rotate_left(other_ix);
+
+            opposite == self.segments
+        } else {
+            false
+        }
+    }
+}
 impl PartialEq for Poly {
     fn eq(&self, other: &Self) -> bool {
         let len_is_same = self.segments.len() == other.segments.len();
@@ -410,6 +568,7 @@ impl PartialEq for Poly {
         }
     }
 }
+*/
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
 pub struct PolyId(pub usize);

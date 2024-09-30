@@ -3,7 +3,10 @@ use nalgebra::{ClosedAdd, SimdRealField, Vector3};
 use num_traits::Zero;
 
 use crate::{
-    decimal::Dec, geometry::GeometryDyn, indexes::geo_index::index, origin::BaseOrigin,
+    decimal::Dec,
+    geometry::GeometryDyn,
+    indexes::geo_index::{index, mesh::MeshRefMut},
+    origin::BaseOrigin,
     parametric_iterator::ParametricIterator,
 };
 
@@ -53,7 +56,6 @@ where
                     let b = wf + wss + ht;
                     let c = wf + wss + htt;
                     let d = wf + ws + htt;
-                    dbg!(a, b, c, d);
                     vec![a, b, c, d]
                 })
             })
@@ -71,9 +73,9 @@ where
         + From<usize>
         + From<u16>,
 {
-    fn polygonize(&self, index: &mut index::GeoIndex, _complexity: usize) -> anyhow::Result<()> {
+    fn polygonize(&self, mut mesh: MeshRefMut, _complexity: usize) -> anyhow::Result<()> {
         for p in self.render() {
-            index.save_as_polygon(&p, None)?;
+            mesh.add_polygon(p.as_slice());
         }
 
         Ok(())

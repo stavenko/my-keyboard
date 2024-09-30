@@ -16,6 +16,7 @@ use crate::{
         length::Length,
         line::GetT,
     },
+    indexes::geo_index::mesh::MeshRefMut,
     parametric_iterator::ParametricIterator,
 };
 
@@ -39,11 +40,7 @@ where
         + nalgebra::Scalar
         + nalgebra::Field,
 {
-    fn polygonize(
-        self,
-        index: &mut crate::indexes::geo_index::index::GeoIndex,
-        complexity: usize,
-    ) -> anyhow::Result<()> {
+    fn polygonize(self, mesh: &mut MeshRefMut, complexity: usize) -> anyhow::Result<()> {
         let Self(mut line1, inversed, _, _) = self;
         let mut vertices = Vec::new();
         loop {
@@ -62,12 +59,9 @@ where
             line1 = fs;
         }
         if inversed {
-            index.save_as_polygon(
-                &vertices.into_iter().map(|t| t.point()).rev().collect_vec(),
-                None,
-            )?;
+            mesh.add_polygon(&vertices.into_iter().map(|t| t.point()).rev().collect_vec())?;
         } else {
-            index.save_as_polygon(&vertices.into_iter().map(|t| t.point()).collect_vec(), None)?;
+            mesh.add_polygon(&vertices.into_iter().map(|t| t.point()).collect_vec())?;
         }
         Ok(())
     }

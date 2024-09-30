@@ -1,7 +1,5 @@
 use std::{
-    borrow::Cow,
     collections::{HashMap, HashSet},
-    iter::FilterMap,
     rc::Rc,
 };
 
@@ -19,8 +17,9 @@ use geometry::{
         },
     },
     indexes::geo_index::{
-        index::{self, GeoIndex, PolygonFilter},
-        mesh::MeshId,
+        geo_object::GeoObject,
+        index::{GeoIndex, PolygonFilter},
+        mesh::{MeshId, MeshRefMut},
         poly::PolyId,
     },
 };
@@ -352,7 +351,7 @@ impl RightKeyboardConfig {
             .fold(Root::new(), |hp, l| hp.push_back(l))
     }
 
-    pub(crate) fn inner_wall_surface(&self, index: &mut GeoIndex) -> anyhow::Result<()> {
+    pub(crate) fn inner_wall_surface(&self, mut mesh: MeshRefMut) -> anyhow::Result<()> {
         let outline = self.table_outline.clone();
         let around_buttons = self.line_around_buttons_inner();
         if outline.len() != around_buttons.len() {
@@ -363,11 +362,11 @@ impl RightKeyboardConfig {
             );
         }
 
-        DynamicSurface::new(around_buttons, outline).polygonize(index, 8)?;
+        DynamicSurface::new(around_buttons, outline).polygonize(&mut mesh, 8)?;
         Ok(())
     }
 
-    pub(crate) fn outer_wall_surface(&self, index: &mut GeoIndex) -> anyhow::Result<()> {
+    pub(crate) fn outer_wall_surface(&self, mut mesh: MeshRefMut) -> anyhow::Result<()> {
         let mut outline = self
             .table_outline
             .clone()
@@ -382,11 +381,11 @@ impl RightKeyboardConfig {
             );
         }
 
-        DynamicSurface::new(outline, around_buttons).polygonize(index, 8)?;
+        DynamicSurface::new(outline, around_buttons).polygonize(&mut mesh, 8)?;
         Ok(())
     }
 
-    pub(crate) fn fill_between_collections(&self, index: &mut GeoIndex) -> anyhow::Result<()> {
+    pub(crate) fn fill_between_collections(&self, mesh: &mut MeshRefMut) -> anyhow::Result<()> {
         let right_line_inner = self
             .thumb_buttons
             .right_line_inner(self.main_plane_thickness)
@@ -413,46 +412,45 @@ impl RightKeyboardConfig {
             .next_and_peek(|a, b| HyperLine::new_2(*a, *b))
             .fold(Root::new(), |hp, l| hp.push_back(l));
 
-        DynamicSurface::new(right_line_inner, left_line_inner).polygonize(index, 8)?;
-        DynamicSurface::new(left_line_outer, right_line_outer).polygonize(index, 8)?;
+        DynamicSurface::new(right_line_inner, left_line_inner).polygonize(mesh, 8)?;
+        DynamicSurface::new(left_line_outer, right_line_outer).polygonize(mesh, 8)?;
         Ok(())
     }
 
-    pub(crate) fn fill_between_buttons(&self, index: &mut GeoIndex) -> anyhow::Result<()> {
+    pub(crate) fn fill_between_buttons(&self, mut mesh: MeshRefMut) -> anyhow::Result<()> {
         self.main_buttons
-            .fill_columns(index, self.main_plane_thickness)?;
+            .fill_columns(&mut mesh, self.main_plane_thickness)?;
         self.thumb_buttons
-            .fill_columns(index, self.main_plane_thickness)?;
+            .fill_columns(&mut mesh, self.main_plane_thickness)?;
         self.main_buttons
-            .fill_between_columns_inner(index, self.main_plane_thickness)?;
+            .fill_between_columns_inner(&mut mesh, self.main_plane_thickness)?;
         self.main_buttons
-            .fill_between_columns_outer(index, self.main_plane_thickness)?;
+            .fill_between_columns_outer(&mut mesh, self.main_plane_thickness)?;
         self.thumb_buttons
-            .fill_between_columns_inner(index, self.main_plane_thickness)?;
+            .fill_between_columns_inner(&mut mesh, self.main_plane_thickness)?;
 
         self.thumb_buttons
-            .fill_between_columns_outer(index, self.main_plane_thickness)?;
+            .fill_between_columns_outer(&mut mesh, self.main_plane_thickness)?;
 
-        self.fill_between_collections(index)?;
+        self.fill_between_collections(&mut mesh)?;
 
         Ok(())
     }
 
-    pub(crate) fn buttons(&self, index: &mut GeoIndex) -> anyhow::Result<()> {
-        for b in self
+    pub(crate) fn buttons(&self, index: &mut GeoIndex) -> anyhow::Result<Vec<MeshId>> {
+        let meshes = self
             .main_buttons
             .buttons()
             .chain(self.thumb_buttons.buttons())
-        {
-            b.mesh(index, self.main_plane_thickness)?;
-        }
+            .filter_map(|b| b.mesh(index, self.main_plane_thickness).ok())
+            .collect();
 
-        Ok(())
+        Ok(meshes)
     }
 
     pub(crate) fn inner_outer_surface_table_connection(
         &self,
-        index: &mut GeoIndex,
+        mut mesh: MeshRefMut,
     ) -> anyhow::Result<()> {
         let mut outline = self.table_outline.clone();
         let mut shifted_outline = outline
@@ -466,7 +464,7 @@ impl RightKeyboardConfig {
             outline = fs;
             shifted_outline = ss;
 
-            PrimitiveSurface(s.to_points(), f.to_points()).polygonize(index, 8)?;
+            PrimitiveSurface(s.to_points(), f.to_points()).polygonize(&mut mesh, 8)?;
             if outline.len() == 0 {
                 break;
             }
@@ -476,7 +474,7 @@ impl RightKeyboardConfig {
 
     fn connect_two_lines(
         &self,
-        index: &mut GeoIndex,
+        mut mesh: MeshRefMut,
         mut line_one: Root<SuperPoint<Dec>>,
         mut line_two: Root<SuperPoint<Dec>>,
     ) -> anyhow::Result<()> {
@@ -486,7 +484,7 @@ impl RightKeyboardConfig {
             line_one = fs;
             line_two = ss;
 
-            PrimitiveSurface(s.to_points(), f.to_points()).polygonize(index, 8)?;
+            PrimitiveSurface(s.to_points(), f.to_points()).polygonize(&mut mesh, 8)?;
             if line_one.len() == 0 {
                 break;
             }
@@ -496,8 +494,7 @@ impl RightKeyboardConfig {
     }
 
     pub fn bottom_pad(&self, index: &mut GeoIndex) -> anyhow::Result<MeshId> {
-        index.create_new_mesh_and_set_as_default();
-        let plate_border = index.get_current_default_mesh();
+        let plate_border = index.new_mesh();
 
         let mut inner_outline_upper = self
             .table_outline
@@ -521,11 +518,15 @@ impl RightKeyboardConfig {
         });
 
         self.connect_two_lines(
-            index,
+            plate_border.make_mut_ref(index),
             outer_outline_upper.clone(),
             inner_outline_upper.clone(),
         )?;
-        self.connect_two_lines(index, outer_outline_lower.clone(), outer_outline_upper)?;
+        self.connect_two_lines(
+            plate_border.make_mut_ref(index),
+            outer_outline_lower.clone(),
+            outer_outline_upper,
+        )?;
 
         let inner_inside_extension_line = inner_outline_upper.clone().map(|l| {
             l.map(|mut t| {
@@ -535,26 +536,21 @@ impl RightKeyboardConfig {
         });
 
         self.connect_two_lines(
-            index,
+            plate_border.make_mut_ref(index),
             inner_outline_upper,
             inner_inside_extension_line.clone(),
         )?;
 
-        index.create_new_mesh_and_set_as_default();
+        let bottom_plane = index.new_mesh();
         let poly = PolygonFromLineInPlane::new(outer_outline_lower, false);
-        poly.polygonize(index, 8)?;
+        poly.polygonize(&mut bottom_plane.make_mut_ref(index), 8)?;
 
-        let bottom_plane = index.get_current_default_mesh();
-
-        index.create_new_mesh_and_set_as_default();
+        let top_plane = index.new_mesh();
         let poly = PolygonFromLineInPlane::new(inner_inside_extension_line, true);
-        poly.polygonize(index, 8)?;
+        poly.polygonize(&mut top_plane.make_mut_ref(index), 8)?;
 
-        let top_plane = index.get_current_default_mesh();
-
-        index.create_new_mesh_and_set_as_default();
-        self.inner_wall_surface(index)?;
-        let inner_border = index.get_current_default_mesh();
+        let inner_border = index.new_mesh();
+        self.inner_wall_surface(inner_border.make_mut_ref(index))?;
 
         let additional_material =
             self.add_material(KeyboardMesh::Bottom, top_plane, bottom_plane, index)?;
@@ -569,11 +565,11 @@ impl RightKeyboardConfig {
             [index.select_polygons(inner_border, plate_border, PolygonFilter::Back)].concat();
 
         for p in to_delete {
-            index.remove_polygon(p);
+            p.make_mut_ref(index).remove();
         }
 
         for p in to_flip {
-            index.flip_polygon(p);
+            p.make_mut_ref(index).flip();
         }
 
         index.move_all_polygons(bottom_plane, plate_border);
@@ -594,8 +590,8 @@ impl RightKeyboardConfig {
     fn add_material(
         &self,
         to: KeyboardMesh,
-        inner_mesh: MeshId,
-        outer_mesh: MeshId,
+        inner_wall_surface: MeshId,
+        outer_wall_surface: MeshId,
         index: &mut GeoIndex,
     ) -> anyhow::Result<Vec<MeshId>> {
         let material_polygons = self
@@ -609,19 +605,29 @@ impl RightKeyboardConfig {
                 }
             })
             .filter_map(|(addition, material)| {
-                index.create_new_mesh_and_set_as_default();
-                material.polygonize(index, 0).ok()?;
-                let bolt_head_material = index.get_current_default_mesh();
+                let material_mesh = index.new_mesh();
+                material
+                    .polygonize(material_mesh.make_mut_ref(index), 0)
+                    .ok()?;
+                let bolt_head_material = index.new_mesh();
 
                 match addition {
                     MaterialAddition::InnerSurface => {
                         let bolt_head_below_outer = index
-                            .select_polygons(bolt_head_material, outer_mesh, PolygonFilter::Back)
+                            .select_polygons(
+                                bolt_head_material,
+                                outer_wall_surface,
+                                PolygonFilter::Back,
+                            )
                             .into_iter()
                             .collect::<HashSet<_>>();
 
                         let bolt_head_above_inner = index
-                            .select_polygons(bolt_head_material, inner_mesh, PolygonFilter::Back)
+                            .select_polygons(
+                                bolt_head_material,
+                                inner_wall_surface,
+                                PolygonFilter::Back,
+                            )
                             .into_iter()
                             .collect::<HashSet<_>>();
                         let betwee_walls = bolt_head_above_inner
@@ -631,13 +637,13 @@ impl RightKeyboardConfig {
 
                         let to_remove = [
                             index.select_polygons(
-                                inner_mesh,
+                                inner_wall_surface,
                                 bolt_head_material,
                                 PolygonFilter::Back,
                             ),
                             index.select_polygons(
                                 bolt_head_material,
-                                outer_mesh,
+                                outer_wall_surface,
                                 PolygonFilter::Front,
                             ),
                             betwee_walls,
@@ -645,7 +651,8 @@ impl RightKeyboardConfig {
                         .concat();
 
                         for p in to_remove {
-                            index.remove_polygon(p);
+                            p.make_mut_ref(index).remove();
+                            //index.remove_polygon(p);
                         }
 
                         Some(bolt_head_material)
@@ -665,9 +672,8 @@ impl RightKeyboardConfig {
         index: &mut GeoIndex,
     ) -> anyhow::Result<()> {
         for hole in self.holes.get(&holes).into_iter().flatten() {
-            index.create_new_mesh_and_set_as_default();
-            hole.polygonize(index, 0)?;
-            let hole_mesh = index.get_current_default_mesh();
+            let hole_mesh = index.new_mesh();
+            hole.polygonize(hole_mesh.make_mut_ref(index), 0)?;
             println!("hole mesh: {hole_mesh:?}");
 
             let to_remove = [
@@ -677,10 +683,11 @@ impl RightKeyboardConfig {
             .concat();
             let to_flip = [index.select_polygons(hole_mesh, to_mesh, PolygonFilter::Back)].concat();
             for p in to_remove {
-                index.remove_polygon(p);
+                p.make_mut_ref(index).remove();
             }
+
             for p in to_flip {
-                index.flip_polygon(p);
+                p.make_mut_ref(index).flip();
             }
             index.move_all_polygons(hole_mesh, to_mesh);
         }
@@ -688,27 +695,32 @@ impl RightKeyboardConfig {
     }
 
     pub fn buttons_hull(&self, index: &mut GeoIndex) -> anyhow::Result<MeshId> {
-        self.inner_wall_surface(index)?;
-        let hull = index.get_current_default_mesh();
+        let inner_wall_surface = index.new_mesh();
+        let outer_wall_surface = index.new_mesh();
+        let buttons = index.new_mesh();
+        let buttons_filling = index.new_mesh();
+        let table_bottom_surface = index.new_mesh();
 
-        index.create_new_mesh_and_set_as_default();
-        self.outer_wall_surface(index)?;
-        let outer_wall_surface = index.get_current_default_mesh();
+        println!("inner");
+        self.inner_wall_surface(inner_wall_surface.make_mut_ref(index))?;
 
-        index.create_new_mesh_and_set_as_default();
-        self.buttons(index)?;
-        let buttons = index.get_current_default_mesh();
+        println!("outer");
+        self.outer_wall_surface(outer_wall_surface.make_mut_ref(index))?;
 
-        index.create_new_mesh_and_set_as_default();
-        self.fill_between_buttons(index)?;
-        let buttons_filling = index.get_current_default_mesh();
+        println!("buttons");
+        for button_item in self.buttons(index)? {
+            index.move_all_polygons(button_item, buttons);
+        }
 
-        index.create_new_mesh_and_set_as_default();
-        self.inner_outer_surface_table_connection(index)?;
-        let table_bottom_surface = index.get_current_default_mesh();
+        println!("fill between");
+        self.fill_between_buttons(buttons_filling.make_mut_ref(index))?;
 
-        index.create_new_mesh_and_set_as_default();
+        println!("fill between surfaces");
+        self.inner_outer_surface_table_connection(table_bottom_surface.make_mut_ref(index))?;
 
+        let hull = inner_wall_surface;
+
+        println!("bolt fills");
         let addition_material_polygons =
             self.add_material(KeyboardMesh::ButtonsHull, hull, outer_wall_surface, index)?;
         index.move_all_polygons(outer_wall_surface, hull);
@@ -719,8 +731,8 @@ impl RightKeyboardConfig {
             index.move_all_polygons(mesh_id, hull);
         }
 
+        println!("bolt holes");
         self.apply_holes(KeyboardMesh::ButtonsHull, hull, index)?;
         Ok(hull)
-        //Ok(MeshId(0))
     }
 }

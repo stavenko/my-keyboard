@@ -1,9 +1,9 @@
-use crate::indexes::geo_index::index::GeoIndex;
+use crate::indexes::geo_index::{index::GeoIndex, mesh::MeshRefMut};
 
 pub trait Geometry {
-    fn polygonize(self, index: &mut GeoIndex, complexity: usize) -> anyhow::Result<()>;
+    fn polygonize(self, mesh: &mut MeshRefMut, complexity: usize) -> anyhow::Result<()>;
 }
 
 pub trait GeometryDyn {
-    fn polygonize(&self, index: &mut GeoIndex, complexity: usize) -> anyhow::Result<()>;
+    fn polygonize(&self, mesh: MeshRefMut, complexity: usize) -> anyhow::Result<()>;
 }

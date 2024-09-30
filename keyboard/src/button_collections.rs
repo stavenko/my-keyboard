@@ -5,9 +5,9 @@ use geometry::{
         hyper_line::HyperLine,
         hyper_path::{HyperPath, Root},
         hyper_point::SuperPoint,
-        hyper_surface::{dynamic_surface::DynamicSurface},
+        hyper_surface::dynamic_surface::DynamicSurface,
     },
-    indexes::geo_index::index::GeoIndex,
+    indexes::geo_index::mesh::MeshRefMut,
 };
 
 use crate::{
@@ -129,17 +129,17 @@ impl ButtonsCollection {
             .flat_map(move |c| c.right_bottom_corner_inner(thickness))
     }
 
-    pub(crate) fn fill_columns(&self, index: &mut GeoIndex, thickness: Dec) -> anyhow::Result<()> {
+    pub(crate) fn fill_columns(&self, mesh: &mut MeshRefMut, thickness: Dec) -> anyhow::Result<()> {
         for c in &self.columns {
-            c.filler_inner(index, thickness)?;
-            c.filler_outer(index, thickness)?;
+            c.filler_inner(mesh, thickness)?;
+            c.filler_outer(mesh, thickness)?;
         }
         Ok(())
     }
 
     pub(crate) fn fill_between_columns_inner(
         &self,
-        index: &mut GeoIndex,
+        mesh: &mut MeshRefMut,
         thickness: Dec,
     ) -> anyhow::Result<()> {
         for c in self.columns.iter().next_and_peek(move |p, n| {
@@ -154,14 +154,14 @@ impl ButtonsCollection {
                 .fold(Root::new(), |hp, l| hp.push_back(l));
             DynamicSurface::new(right_line, left_line)
         }) {
-            c.polygonize(index, 1)?;
+            c.polygonize(mesh, 1)?;
         }
         Ok(())
     }
 
     pub(crate) fn fill_between_columns_outer(
         &self,
-        index: &mut GeoIndex,
+        mesh: &mut MeshRefMut,
         thickness: Dec,
     ) -> anyhow::Result<()> {
         for c in self.columns.iter().next_and_peek(move |p, n| {
@@ -176,7 +176,7 @@ impl ButtonsCollection {
                 .fold(Root::new(), |hp, l| hp.push_back(l));
             DynamicSurface::new(left_line, right_line)
         }) {
-            c.polygonize(index, 1)?;
+            c.polygonize(mesh, 1)?;
         }
         Ok(())
     }

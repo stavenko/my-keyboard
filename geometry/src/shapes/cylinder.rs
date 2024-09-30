@@ -2,7 +2,12 @@ use nalgebra::{ComplexField, Vector3};
 use num_traits::Zero;
 use rust_decimal::Decimal;
 
-use crate::{decimal::Dec, geometry::GeometryDyn, indexes::geo_index::index, origin::Origin};
+use crate::{
+    decimal::Dec,
+    geometry::GeometryDyn,
+    indexes::geo_index::{index, mesh::MeshRefMut},
+    origin::Origin,
+};
 
 #[derive(Clone)]
 pub struct Cylinder {
@@ -122,10 +127,9 @@ impl Cylinder {
 }
 
 impl GeometryDyn for Cylinder {
-    fn polygonize(&self, index: &mut index::GeoIndex, _complexity: usize) -> anyhow::Result<()> {
-        for (i, p) in self.render().into_iter().enumerate() {
-            //println!("~~~~~~~~~~~~~~~~~~~{i}~~~~~~~~~~~~~~~~~");
-            index.save_as_polygon(&p, None)?;
+    fn polygonize(&self, mut mesh: MeshRefMut, _complexity: usize) -> anyhow::Result<()> {
+        for p in self.render() {
+            mesh.add_polygon(&p)?;
         }
 
         Ok(())

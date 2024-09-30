@@ -1,10 +1,15 @@
 use std::{fmt, ops::Deref};
 
 use nalgebra::Vector3;
+use num_traits::One;
 
 use crate::{decimal::Dec, indexes::vertex_index::PtId};
 
-use super::{index::GeoIndex, seg::SegmentDir};
+use super::{
+    geo_object::{GeoObject, UnRef},
+    index::GeoIndex,
+    seg::SegmentDir,
+};
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Ord, PartialOrd)]
 pub struct RibId(pub(super) usize);
@@ -27,11 +32,20 @@ pub struct RibRef<'a> {
     pub(super) rib_id: RibId,
 }
 
+pub struct RibRefMut<'a> {
+    pub(crate) index: &'a mut GeoIndex,
+    pub(super) rib_id: RibId,
+}
+
 impl<'a> RibRef<'a> {
     pub(crate) fn from(&self) -> Vector3<Dec> {
         self.index
             .vertices
             .get_point(self.index.ribs[&self.rib_id].0)
+    }
+
+    pub(crate) fn middle(&self) -> Vector3<Dec> {
+        self.from().lerp(&self.to(), Dec::one() / 2)
     }
 
     pub(crate) fn to(&self) -> Vector3<Dec> {
@@ -76,5 +90,41 @@ impl fmt::Debug for RibId {
 impl PartialEq<usize> for RibId {
     fn eq(&self, other: &usize) -> bool {
         self.0 == *other
+    }
+}
+
+impl<'a> UnRef<'a> for RibRef<'a> {
+    type Obj = RibId;
+
+    fn un_ref(self) -> Self::Obj {
+        self.rib_id
+    }
+}
+
+impl<'a> UnRef<'a> for RibRefMut<'a> {
+    type Obj = RibId;
+
+    fn un_ref(self) -> Self::Obj {
+        self.rib_id
+    }
+}
+
+impl<'a> GeoObject<'a> for RibId {
+    type Ref = RibRef<'a>;
+
+    type MutRef = RibRefMut<'a>;
+
+    fn make_ref(&self, index: &'a GeoIndex) -> Self::Ref {
+        RibRef {
+            index,
+            rib_id: *self,
+        }
+    }
+
+    fn make_mut_ref(&self, index: &'a mut GeoIndex) -> Self::MutRef {
+        RibRefMut {
+            index,
+            rib_id: *self,
+        }
     }
 }

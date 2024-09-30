@@ -1,15 +1,17 @@
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     fmt::{self, Debug},
 };
 
-use nalgebra::{Matrix2, Vector2, Vector3};
+use nalgebra::{ComplexField, Matrix2, Vector2, Vector3};
 use num_traits::Zero;
+use rust_decimal_macros::dec;
 use uuid::Uuid;
 
 use crate::{decimal::Dec, indexes::vertex_index::PtId};
 
 use super::{
+    geo_object::{GeoObject, UnRef},
     index::GeoIndex,
     rib::{Rib, RibId, RibRef},
 };
@@ -18,13 +20,13 @@ use super::{
 pub struct SegId(Uuid);
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub(crate) enum SegmentDir {
+pub enum SegmentDir {
     Fow,
     Rev,
 }
 
 impl SegmentDir {
-    fn flip(&self) -> SegmentDir {
+    pub fn flip(&self) -> SegmentDir {
         match self {
             SegmentDir::Fow => Self::Rev,
             SegmentDir::Rev => Self::Fow,
@@ -43,6 +45,12 @@ pub struct SegRef<'i> {
     pub(super) rib_id: RibId,
     pub(super) dir: SegmentDir,
     pub(super) index: &'i GeoIndex,
+}
+
+pub struct SegRefMut<'i> {
+    pub(super) rib_id: RibId,
+    pub(super) dir: SegmentDir,
+    pub(super) index: &'i mut GeoIndex,
 }
 
 #[derive(Copy, Clone)]
@@ -116,6 +124,9 @@ impl<'a> SegmentRef<'a> {
     }
 
     pub(crate) fn get_intersection_params_seg_ref(&self, to: &SegRef<'_>) -> Option<(Dec, Dec)> {
+        let vertex_pulling = Dec::from(dec!(0.001)); // one micrometer
+        let vertex_pulling_sq = vertex_pulling * vertex_pulling;
+
         let segment_dir = to.dir().normalize();
         let self_dir = self.dir().normalize();
         let q = self.from() - to.from();
@@ -125,9 +136,20 @@ impl<'a> SegmentRef<'a> {
         let m = Matrix2::new(Dec::from(1), -dot, dot, -Dec::from(1));
         let b = -Vector2::new(q.dot(&self_dir), q.dot(&segment_dir));
 
+        if m.determinant().abs() < vertex_pulling_sq {
+            return None;
+        }
+
         if let Some(mi) = m.try_inverse() {
             let st = mi * b;
-            Some((st.x / self.dir().magnitude(), st.y / to.dir().magnitude()))
+            let p1 = self.dir() * st.x + self.from();
+            let p2 = to.dir().normalize() * st.y + to.from();
+            let dist = p1 - p2;
+            if dist.magnitude_squared() < vertex_pulling_sq {
+                Some((st.x, st.y / to.dir().magnitude()))
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -152,7 +174,7 @@ impl<'a> SegRef<'a> {
     }
 
     #[allow(clippy::wrong_self_convention)]
-    pub(crate) fn to_pt(&self) -> PtId {
+    pub fn to_pt(&self) -> PtId {
         let rib = self
             .index
             .ribs
@@ -165,7 +187,7 @@ impl<'a> SegRef<'a> {
     }
 
     #[allow(clippy::wrong_self_convention)]
-    pub(crate) fn from_pt(&self) -> PtId {
+    pub fn from_pt(&self) -> PtId {
         let rib = self
             .index
             .ribs
@@ -198,6 +220,10 @@ impl<'a> SegRef<'a> {
             dir: self.dir,
         }
     }
+
+    pub fn rib_id(&self) -> RibId {
+        self.rib_id
+    }
 }
 
 impl Default for SegId {
@@ -214,14 +240,14 @@ impl Seg {
         }
     }
 
-    pub(super) fn to(&self, ribs: &HashMap<RibId, Rib>) -> PtId {
+    pub(super) fn to(&self, ribs: &BTreeMap<RibId, Rib>) -> PtId {
         let rib = ribs[&self.rib_id];
         match self.dir {
             SegmentDir::Fow => rib.1,
             SegmentDir::Rev => rib.0,
         }
     }
-    pub(super) fn from(&self, ribs: &HashMap<RibId, Rib>) -> PtId {
+    pub(super) fn from(&self, ribs: &BTreeMap<RibId, Rib>) -> PtId {
         let rib = ribs[&self.rib_id];
         match self.dir {
             SegmentDir::Fow => rib.0,
@@ -233,6 +259,47 @@ impl Seg {
             rib_id: self.rib_id,
             dir: self.dir,
             index,
+        }
+    }
+}
+
+impl<'a> UnRef<'a> for SegRef<'a> {
+    type Obj = Seg;
+
+    fn un_ref(self) -> Self::Obj {
+        Seg {
+            rib_id: self.rib_id,
+            dir: self.dir,
+        }
+    }
+}
+
+impl<'a> UnRef<'a> for SegRefMut<'a> {
+    type Obj = RibId;
+
+    fn un_ref(self) -> Self::Obj {
+        self.rib_id
+    }
+}
+
+impl<'a> GeoObject<'a> for Seg {
+    type Ref = SegRef<'a>;
+
+    type MutRef = SegRefMut<'a>;
+
+    fn make_ref(&self, index: &'a GeoIndex) -> Self::Ref {
+        SegRef {
+            index,
+            rib_id: self.rib_id,
+            dir: self.dir,
+        }
+    }
+
+    fn make_mut_ref(&self, index: &'a mut GeoIndex) -> Self::MutRef {
+        SegRefMut {
+            index,
+            rib_id: self.rib_id,
+            dir: self.dir,
         }
     }
 }

@@ -13,6 +13,7 @@ use crate::{
         hyper_point::{Point, SideDir, Tensor},
         line::GetT,
     },
+    indexes::geo_index::mesh::MeshRefMut,
     parametric_iterator::ParametricIterator,
 };
 use nalgebra::Vector3;
@@ -45,20 +46,16 @@ where
     HyperLine<T>: IsLinear,
     <T as SideDir>::Vector: Add<<T as Point>::Vector, Output = <T as Point>::Vector>,
 {
-    fn polygonize(
-        self,
-        index: &mut crate::indexes::geo_index::index::GeoIndex,
-        complexity: usize,
-    ) -> anyhow::Result<()> {
+    fn polygonize(self, mesh: &mut MeshRefMut, complexity: usize) -> anyhow::Result<()> {
         if self.0.is_linear() && self.1.is_linear() {
             let l1 = self.get_line_at(S::zero());
             let l2 = self.get_line_at(S::one());
-            PrimitiveSurface(l1, l2).polygonize(index, complexity)?;
+            PrimitiveSurface(l1, l2).polygonize(mesh, complexity)?;
         } else {
             for (t, tt) in ParametricIterator::<S>::new(complexity) {
                 let l1 = self.get_line_at(t);
                 let l2 = self.get_line_at(tt);
-                PrimitiveSurface(l1, l2).polygonize(index, complexity)?;
+                PrimitiveSurface(l1, l2).polygonize(mesh, complexity)?;
             }
         }
         Ok(())

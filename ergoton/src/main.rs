@@ -13,7 +13,11 @@ use geometry::{
         hyper_point::SuperPoint,
         split_hyper_line::SplitHyperLine,
     },
-    indexes::{aabb::Aabb, geo_index::index::GeoIndex},
+    indexes::{
+        aabb::Aabb,
+        geo_index::{face::FaceId, index::GeoIndex},
+    },
+    origin::Origin,
     polygon_basis::PolygonBasis,
 };
 use keyboard::{
@@ -353,7 +357,7 @@ fn main() -> Result<(), anyhow::Error> {
         ),
     };
 
-    buttons_hull.poly_split_debug(23, some_basis);
+    buttons_hull.face_debug(23, Some(FaceId(23)));
 
     /*keyboard.buttons_hull(&mut buttons_hull).unwrap();
 
@@ -364,16 +368,24 @@ fn main() -> Result<(), anyhow::Error> {
     */
 
     let mut chok_hotswap_top = GeoIndex::new(Aabb::from_points(&[
-        Vector3::new(Dec::from(-15), Dec::from(-10), Dec::from(-10)),
-        Vector3::new(Dec::from(15), Dec::from(15), Dec::from(10)),
+        Vector3::new(Dec::from(-15), Dec::from(-15), Dec::from(-15)),
+        Vector3::new(Dec::from(15), Dec::from(15), Dec::from(16)),
     ]))
     .debug_svg_path(cli.output_path.clone())
     .input_polygon_min_rib_length(dec!(0.05))
     .points_precision(dec!(0.001));
 
     let mut chok_hotswap_bottom = GeoIndex::new(Aabb::from_points(&[
-        Vector3::new(Dec::from(-15), Dec::from(-10), Dec::from(-10)),
-        Vector3::new(Dec::from(15), Dec::from(15), Dec::from(10)),
+        Vector3::new(Dec::from(-15), Dec::from(-15), Dec::from(-10)),
+        Vector3::new(Dec::from(15), Dec::from(15), Dec::from(16)),
+    ]))
+    .debug_svg_path(cli.output_path.clone())
+    .input_polygon_min_rib_length(dec!(0.05))
+    .points_precision(dec!(0.001));
+
+    let mut chok_hotswap_mount = GeoIndex::new(Aabb::from_points(&[
+        Vector3::new(Dec::from(-20), Dec::from(-20), Dec::from(-20)),
+        Vector3::new(Dec::from(20), Dec::from(20), Dec::from(20)),
     ]))
     .debug_svg_path(cli.output_path.clone())
     .input_polygon_min_rib_length(dec!(0.05))
@@ -402,28 +414,28 @@ fn main() -> Result<(), anyhow::Error> {
     //chok_hotswap_top.poly_split_debug(911, xz.clone());
     //chok_hotswap_top.poly_split_debug(913, xz);
 
-    //chok.top_mesh(&mut chok_hotswap_top)?;
-    chok.bottom_mesh(&mut chok_hotswap_bottom)?;
+    chok_hotswap_top.face_debug(333, None);
+    chok.top_mesh(&mut chok_hotswap_top)?;
+    //chok.bottom_mesh(&mut chok_hotswap_bottom)?;
+    chok.outer_mount(Origin::new(), &mut chok_hotswap_mount)?;
 
-    let scad_path = cli.output_path.join("chok_hotswap_top.scad");
+    let scad_path_all = cli.output_path.join("chok_hotswap_all.scad");
+    let scad_path_top = cli.output_path.join("chok_hotswap_top.scad");
+    let scad_path_bottom = cli.output_path.join("chok_hotswap_bottom.scad");
+    let scad_path_mount = cli.output_path.join("chok_hotswap_mount.scad");
     let scad = chok_hotswap_top.scad();
-    let top = format!("translate(v=[0, 15, 0]) {{ {scad} }};");
+    let top = format!("translate(v=[0, 0, 0]) {{ {scad} }};");
     let scad = chok_hotswap_bottom.scad();
     let bottom = format!("translate(v=[0, 0, 0]) {{ {scad} }};");
+    let scad = chok_hotswap_mount.scad();
+    let mount = format!("translate(v=[0, 0, 7]) {{ {scad} }};");
 
-    let totals = format!("{top}\n{bottom}");
+    let totals = format!("{top}\n{bottom}\n{mount}");
 
-    std::fs::write(scad_path, totals)?;
+    std::fs::write(scad_path_all, totals)?;
+    std::fs::write(scad_path_top, top)?;
+    std::fs::write(scad_path_bottom, bottom)?;
+    std::fs::write(scad_path_mount, mount)?;
 
-    /*
-        let mut writer = OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .create(true)
-            .open(main_button_hull_path)?;
-
-        stl_io::write_stl(&mut writer, buttons_hull.into_iter())?;
-
-    */
     Ok(())
 }

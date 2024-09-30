@@ -1,7 +1,12 @@
 use nalgebra::Vector3;
 use num_traits::One;
 
-use crate::{decimal::Dec, geometry::GeometryDyn, indexes::geo_index::index, origin::Origin};
+use crate::{
+    decimal::Dec,
+    geometry::GeometryDyn,
+    indexes::geo_index::{index, mesh::MeshRefMut},
+    origin::Origin,
+};
 
 pub struct Rect {
     width: Dec,
@@ -183,9 +188,9 @@ impl Rect {
 }
 
 impl GeometryDyn for Rect {
-    fn polygonize(&self, index: &mut index::GeoIndex, _complexity: usize) -> anyhow::Result<()> {
+    fn polygonize(&self, mut mesh: MeshRefMut, _complexity: usize) -> anyhow::Result<()> {
         for p in self.render() {
-            index.save_as_polygon(&p, None)?;
+            mesh.add_polygon(&p);
         }
 
         Ok(())

@@ -54,6 +54,13 @@ impl ButtonBuilder {
         }
     }
 
+    pub(crate) fn chok_hotswap_custom() -> ButtonBuilder {
+        Self {
+            kind: ButtonMountKind::ChokHotswapCustom,
+            ..Default::default()
+        }
+    }
+
     pub fn additional_padding(mut self, padding: Dec) -> Self {
         self.additional_padding = padding;
         self

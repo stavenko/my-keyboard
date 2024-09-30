@@ -94,10 +94,10 @@ impl<'a> Relation<PolyRef<'a>> for Line {
     type Relate = LinearPolygonRefRelation;
 
     fn relate(&self, to: &PolyRef<'a>) -> Self::Relate {
-        let plane = to.get_plane();
+        let plane = to.plane();
         match self.relate(&plane) {
             LinearPlanarRelation::Intersect(point) => {
-                for segment in to.get_segments() {
+                for segment in to.segments() {
                     match segment.relate(&point) {
                         PointOnLine::On => {
                             return LinearPolygonRefRelation::IntersectRib(*segment.rib(), point)
@@ -115,7 +115,7 @@ impl<'a> Relation<PolyRef<'a>> for Line {
                 let mut common_ribs: Vec<RibRef<'a>> = Vec::new();
                 let mut ribs: Vec<(RibId, Vector3<Dec>)> = Vec::new();
                 let mut vertices: Vec<PtId> = Vec::new();
-                for segment in to.get_segments() {
+                for segment in to.segments() {
                     match self.relate(&segment) {
                         LinearRefRelation::Colinear => {
                             for px in vertices

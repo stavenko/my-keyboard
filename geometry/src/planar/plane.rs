@@ -38,19 +38,17 @@ impl fmt::Debug for Plane {
     }
 }
 
-impl Reversable for Plane {
-    fn flip(mut self) -> Self {
-        self.normal = -self.normal;
-        self.d = -self.d;
-        self
-    }
-}
 impl Plane {
     pub fn new(a: Dec, b: Dec, c: Dec, d: Dec) -> Self {
         Self {
             normal: Vector3::new(a, b, c).normalize(),
             d,
         }
+    }
+
+    pub fn flip(&mut self) {
+        self.normal = -self.normal;
+        self.d = -self.d;
     }
 
     pub fn is_point_on_plane(&self, point: Vector3<Dec>, tolerance: impl Into<Dec>) -> bool {
@@ -101,10 +99,16 @@ impl Plane {
         let dot = self.normal.dot(&unit);
         let ortho = self.normal * dot;
         let in_plane_vec = unit - ortho;
+
         if in_plane_vec.magnitude() == Dec::zero() {
-            println!("nothing can be projected on plane DBG: {dot}, {ortho:?}, {unit:?}");
             return None;
         }
         Some((unit - ortho).normalize())
+    }
+
+    pub(crate) fn flipped(mut self) -> Plane {
+        self.normal = -self.normal;
+        self.d = -self.d;
+        self
     }
 }

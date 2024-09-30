@@ -679,6 +679,21 @@ impl One for Dec {
 impl Dec {
     pub const EPSILON: Self = Self(Decimal::from_parts(1, 0, 0, false, 28));
 
+    pub fn atan2(&self, other: &Self) -> Self {
+        let f1 = self.0.to_f64().unwrap();
+        let f2 = other.0.to_f64().unwrap();
+        let d = f1.atan2(f2);
+        Self::from(d)
+    }
+
+    pub fn two_pi() -> Self {
+        Self(rust_decimal::Decimal::TWO_PI)
+    }
+
+    pub fn pi() -> Self {
+        Self(rust_decimal::Decimal::PI)
+    }
+
     pub fn round(&self) -> Self {
         Self(self.0.round())
     }

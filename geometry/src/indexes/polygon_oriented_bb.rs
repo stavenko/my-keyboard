@@ -1,10 +1,7 @@
 use nalgebra::{Vector2, Vector3};
 use num_traits::Bounded;
 
-use crate::{
-    decimal::Dec,
-    polygon_basis::{PolygonBasis},
-};
+use crate::{decimal::Dec, polygon_basis::PolygonBasis};
 
 use super::geo_index::poly::PolyRef;
 
@@ -18,7 +15,7 @@ pub struct PolygonOrientedBb {
 impl PolygonOrientedBb {
     pub fn create_from_poly(poly_ref: PolyRef<'_>) -> Self {
         let seg1 = poly_ref
-            .get_segments()
+            .segments()
             .next()
             .expect("polygon must at least have 3 segments");
 

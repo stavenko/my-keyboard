@@ -77,13 +77,13 @@ impl fmt::Debug for Polygon {
 }
 
 impl Reversable for Polygon {
-    fn flip(self) -> Self {
-        let plane = self.plane.flip();
+    fn flip(mut self) -> Self {
+        self.plane.flip();
 
         Self {
             vertices: self.vertices.into_iter().rev().collect(),
             //basis: self.basis,
-            plane,
+            plane: self.plane,
         }
     }
 }
@@ -290,7 +290,7 @@ impl Polygon {
             total_area += x1 * y2 - x2 * y1;
         }
         if total_area.is_negative() {
-            plane = plane.flip();
+            plane.flip();
         }
 
         if total_area.is_zero() {

@@ -35,8 +35,6 @@ fn main() -> Result<(), anyhow::Error> {
         .create(true)
         .open(main_button_hull_path)?;
 
-    stl_io::write_stl(&mut writer, top.into_iter())?;
-
     println!("create bottom");
     let mut bottom = GeoIndex::new(Aabb::from_points(&[
         Vector3::new(Dec::from(-50), Dec::from(-50), Dec::from(-50)),
@@ -51,8 +49,7 @@ fn main() -> Result<(), anyhow::Error> {
         .truncate(true)
         .create(true)
         .open(bottom_pad_path)?;
-
-    stl_io::write_stl(&mut writer, bottom.into_iter())?;
+    // TODO: Make scad file
 
     Ok(())
 }

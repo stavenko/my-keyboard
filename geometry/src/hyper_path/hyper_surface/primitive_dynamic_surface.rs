@@ -7,6 +7,7 @@ use crate::{
     decimal::Dec,
     geometry::Geometry,
     hyper_path::{hyper_path::IsLinear, line::GetT},
+    indexes::geo_index::mesh::MeshRefMut,
     parametric_iterator::ParametricIterator,
 };
 
@@ -36,12 +37,7 @@ where
         + nalgebra::Scalar
         + nalgebra::Field,
 {
-    fn polygonize(
-        self,
-        index: &mut crate::indexes::geo_index::index::GeoIndex,
-        complexity: usize,
-    ) -> anyhow::Result<()> {
-        //println!("-- render primitive--");
+    fn polygonize(self, mesh: &mut MeshRefMut, complexity: usize) -> anyhow::Result<()> {
         if self.0.is_linear() && self.1.is_linear() {
             let t = L1::Scalar::zero();
             let tt = L1::Scalar::one();
@@ -49,16 +45,16 @@ where
             let b = self.0.get_t(tt);
             let c = self.1.get_t(tt);
             let d = self.1.get_t(t);
-            index.save_as_polygon(&[a, b, c], None).ok();
-            index.save_as_polygon(&[a, c, d], None).ok();
+            mesh.add_polygon(&[a, b, c]).ok();
+            mesh.add_polygon(&[a, c, d]).ok();
         } else {
             for (t, tt) in ParametricIterator::<L1::Scalar>::new(complexity) {
                 let a = self.0.get_t(t);
                 let b = self.0.get_t(tt);
                 let c = self.1.get_t(tt);
                 let d = self.1.get_t(t);
-                index.save_as_polygon(&[a, b, c], None).ok();
-                index.save_as_polygon(&[a, c, d], None).ok();
+                mesh.add_polygon(&[a, b, c]).ok();
+                mesh.add_polygon(&[a, c, d]).ok();
             }
         }
         Ok(())

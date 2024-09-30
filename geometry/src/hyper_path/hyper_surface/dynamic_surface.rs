@@ -18,7 +18,7 @@ use crate::{
         length::Length,
         split_hyper_line::SplitHyperLine,
     },
-    indexes::geo_index::index::GeoIndex,
+    indexes::geo_index::{index::GeoIndex, mesh::MeshRefMut},
 };
 
 use super::simple_dynamic_surface::SimpleSurface;
@@ -67,16 +67,16 @@ where
     <T as SideDir>::Vector: Add<<T as Point>::Vector, Output = <T as Point>::Vector>,
     <T as Sub<T>>::Output: Length<Scalar = <T as Tensor>::Scalar>,
 {
-    fn polygonize(self, index: &mut GeoIndex, complexity: usize) -> anyhow::Result<()> {
+    fn polygonize(self, mesh: &mut MeshRefMut, complexity: usize) -> anyhow::Result<()> {
         if self.0.len() == self.1.len() && self.0.len() == 1 {
             let (f, _) = self.0.head_tail();
             let (s, _) = self.1.head_tail();
-            SimpleSurface::new(f, s).polygonize(index, complexity)?;
+            SimpleSurface::new(f, s).polygonize(mesh, complexity)?;
         } else if self.0.len() == self.1.len() {
             let (f, ft) = self.0.head_tail();
             let (s, st) = self.1.head_tail();
-            SimpleSurface::new(f, s).polygonize(index, complexity)?;
-            DynamicSurface::new(ft, st).polygonize(index, complexity)?;
+            SimpleSurface::new(f, s).polygonize(mesh, complexity)?;
+            DynamicSurface::new(ft, st).polygonize(mesh, complexity)?;
         } else if self.0.len() != self.1.len() {
             let len_1 = self.0.length();
             let len_2 = self.1.length();
@@ -103,27 +103,27 @@ where
             if s_tail.len() == 0 {
                 let p = S::from(1) / S::from((f_tail.len() + 1) as u16);
                 let (ss, s) = s.split_hyper_line(p);
-                SimpleSurface::new(f, ss).polygonize(index, complexity)?;
+                SimpleSurface::new(f, ss).polygonize(mesh, complexity)?;
                 s_tail = s_tail.push_front(s);
             } else if f_tail.len() == 0 {
                 let p = S::from(1) / S::from((s_tail.len() + 1) as u16);
                 let (ff, f) = f.split_hyper_line(p);
-                SimpleSurface::new(ff, s).polygonize(index, complexity)?;
+                SimpleSurface::new(ff, s).polygonize(mesh, complexity)?;
                 f_tail = f_tail.push_front(f);
             } else if ft_on_second < st_on_second && !is_same {
                 let (ss, s) = s.split_hyper_line(ps);
-                SimpleSurface::new(f, ss).polygonize(index, complexity)?;
+                SimpleSurface::new(f, ss).polygonize(mesh, complexity)?;
 
                 s_tail = s_tail.push_front(s);
             } else if st_on_first < ft_on_first && !is_same {
                 let (ff, f) = f.split_hyper_line(pf);
-                SimpleSurface::new(ff, s).polygonize(index, complexity)?;
+                SimpleSurface::new(ff, s).polygonize(mesh, complexity)?;
 
                 f_tail = f_tail.push_front(f);
             } else {
-                SimpleSurface::new(f, s).polygonize(index, complexity)?;
+                SimpleSurface::new(f, s).polygonize(mesh, complexity)?;
             }
-            DynamicSurface::new(f_tail, s_tail).polygonize(index, complexity)?;
+            DynamicSurface::new(f_tail, s_tail).polygonize(mesh, complexity)?;
         }
         Ok(())
     }

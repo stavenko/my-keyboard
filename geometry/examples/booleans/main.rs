@@ -11,9 +11,11 @@ use geometry::{
     indexes::{
         aabb::Aabb,
         geo_index::{
+            face::FaceId,
+            geo_object::{GeoObject, UnRef},
             index::{GeoIndex, PolygonFilter},
             mesh::MeshId,
-            poly::PolyId,
+            poly::{self, PolyId},
         },
     },
     origin::{self, Origin},
@@ -32,7 +34,7 @@ pub struct Command {
     pub output_path: PathBuf,
 }
 
-fn bigger_by_smaller(file_root: PathBuf) -> anyhow::Result<String> {
+fn rib_unification_1(file_root: PathBuf) -> anyhow::Result<String> {
     let mut index = GeoIndex::new(Aabb::from_points(&[
         Vector3::new(Dec::from(-10), Dec::from(-10), Dec::from(-10)),
         Vector3::new(Dec::from(15), Dec::from(14), Dec::from(10)),
@@ -43,12 +45,71 @@ fn bigger_by_smaller(file_root: PathBuf) -> anyhow::Result<String> {
 
     let zero = Origin::new();
 
-    let smaller_box = Rect::centered(zero.clone(), Dec::one(), Dec::one(), Dec::one());
+    let mesh_one = index.new_mesh();
 
-    let bigger_box = Rect::centered(zero, Dec::one() * 2, Dec::one() * 2, Dec::one() * 2);
+    Plane::centered(zero.clone(), Dec::one(), Dec::one(), 1)
+        .polygonize(mesh_one.make_mut_ref(&mut index), 0)?;
 
-    smaller_box.polygonize(&mut index, 0)?;
-    bigger_box.polygonize(&mut index, 0)?;
+    let mesh_two = index.new_mesh();
+
+    Plane::centered(
+        zero.clone().offset_x(dec!(1.5)),
+        Dec::one() * 2,
+        Dec::one() * 2,
+        1,
+    )
+    .polygonize(mesh_two.make_mut_ref(&mut index), 0)?;
+
+    Ok(index.scad())
+}
+
+fn rib_unification_2(file_root: PathBuf) -> anyhow::Result<String> {
+    let mut index = GeoIndex::new(Aabb::from_points(&[
+        Vector3::new(Dec::from(-10), Dec::from(-10), Dec::from(-10)),
+        Vector3::new(Dec::from(15), Dec::from(14), Dec::from(10)),
+    ]))
+    .debug_svg_path(file_root.clone())
+    .input_polygon_min_rib_length(dec!(0.05))
+    .points_precision(dec!(0.001));
+
+    let mesh_one = index.new_mesh();
+    let zero = Origin::new();
+
+    Plane::centered(
+        zero.clone().offset_x(dec!(1.5)),
+        Dec::one() * 2,
+        Dec::one() * 2,
+        1,
+    )
+    .polygonize(mesh_one.make_mut_ref(&mut index), 0)?;
+
+    let mesh_two = index.new_mesh();
+    Plane::centered(zero.clone(), Dec::one(), Dec::one(), 1)
+        .polygonize(mesh_two.make_mut_ref(&mut index), 0)?;
+
+    Ok(index.scad())
+}
+
+fn cut_planes(file_root: PathBuf) -> anyhow::Result<String> {
+    let mut index = GeoIndex::new(Aabb::from_points(&[
+        Vector3::new(Dec::from(-10), Dec::from(-10), Dec::from(-10)),
+        Vector3::new(Dec::from(15), Dec::from(14), Dec::from(10)),
+    ]))
+    .debug_svg_path(file_root.clone())
+    .input_polygon_min_rib_length(dec!(0.05))
+    .points_precision(dec!(0.001));
+
+    let zero = Origin::new();
+    let rotated = zero
+        .clone()
+        .rotate_axisangle(Vector3::x() * (Dec::from(dec!(3.14)) / 2));
+
+    let mesh_one = index.new_mesh();
+    Plane::centered(zero, Dec::one(), Dec::one(), 1)
+        .polygonize(mesh_one.make_mut_ref(&mut index), 0)?;
+    let mesh_two = index.new_mesh();
+    Plane::centered(rotated, Dec::one() * 2, Dec::one() * 2, 1)
+        .polygonize(mesh_two.make_mut_ref(&mut index), 0)?;
 
     Ok(index.scad())
 }
@@ -64,33 +125,26 @@ fn overlap_in_center(file_root: PathBuf) -> anyhow::Result<String> {
 
     let zero = Origin::new();
 
-    let smaller_box = Rect::centered(zero.clone().offset_x(1), Dec::one(), Dec::one(), Dec::one());
+    let small_box = index.new_mesh();
+    Rect::centered(zero.clone().offset_x(1), Dec::one(), Dec::one(), Dec::one())
+        .polygonize(small_box.make_mut_ref(&mut index), 0)?;
+    let big_box = index.new_mesh();
+    Rect::centered(zero, Dec::one() * 2, Dec::one() * 2, Dec::one() * 2)
+        .polygonize(big_box.make_mut_ref(&mut index), 0)?;
 
-    let bigger_box = Rect::centered(zero, Dec::one() * 2, Dec::one() * 2, Dec::one() * 2);
-
-    let small = index.get_current_default_mesh();
-    smaller_box.polygonize(&mut index, 0)?;
-    let big = index.create_new_mesh_and_set_as_default();
-    bigger_box.polygonize(&mut index, 0)?;
-
-    let remove = [
-        index.select_polygons(
-            small,
-            big,
-            geometry::indexes::geo_index::index::PolygonFilter::Front,
-        ),
-        index.select_polygons(
-            big,
-            small,
-            geometry::indexes::geo_index::index::PolygonFilter::Back,
-        ),
+    let to_remove = [
+        small_box
+            .make_ref(&index)
+            .front_of(big_box.make_ref(&index)),
+        big_box.make_ref(&index).back_of(small_box.make_ref(&index)),
     ]
-    .concat();
+    .into_iter()
+    .flatten()
+    .collect_vec();
 
-    for p in remove {
-        index.remove_polygon(p);
+    for p in to_remove {
+        p.make_mut_ref(&mut index).remove();
     }
-
     Ok(index.scad())
 }
 
@@ -114,10 +168,10 @@ fn overlap_touching_edge(file_root: PathBuf) -> anyhow::Result<String> {
 
     let bigger_box = Rect::centered(zero, Dec::one() * 2, Dec::one() * 2, Dec::one() * 2);
 
-    let small = index.get_current_default_mesh();
-    smaller_box.polygonize(&mut index, 0)?;
-    let big = index.create_new_mesh_and_set_as_default();
-    bigger_box.polygonize(&mut index, 0)?;
+    let small = index.new_mesh();
+    smaller_box.polygonize(small.make_mut_ref(&mut index), 0)?;
+    let big = index.new_mesh();
+    bigger_box.polygonize(big.make_mut_ref(&mut index), 0)?;
 
     let remove = [
         index.select_polygons(
@@ -135,14 +189,42 @@ fn overlap_touching_edge(file_root: PathBuf) -> anyhow::Result<String> {
             small,
             geometry::indexes::geo_index::index::PolygonFilter::Shared,
         ),
+        index.select_polygons(
+            small,
+            big,
+            geometry::indexes::geo_index::index::PolygonFilter::Shared,
+        ),
     ]
     .concat();
 
-    for p in &remove {
-        index.remove_polygon(*p);
+    for poly in remove {
+        //println!("remove {poly:?}: {:?}", poly.make_ref(&index).face_id());
+        poly.make_mut_ref(&mut index).remove();
+    }
+    /*
+    for poly in small.make_ref(&index).into_polygons() {
+        let f = poly.make_ref(&index).face_id();
+        let p = poly.make_ref(&index).poly_id();
+        println!("p: {:?} / {:?}", p, f);
+        if f.0 == 10 {
+            poly.make_mut_ref(&mut index).remove();
+        }
     }
 
+    for f in index.get_face_with_root_parent(FaceId(5)) {
+        println!(">>> {f:?}");
+        for p in small.make_ref(&index).all_polygons() {
+            println!("  >>> {p:?} {:?}", p.make_ref(&index).face_id());
+
+            if p.make_ref(&index).face_id() == f {
+                dbg!(p);
+                p.make_mut_ref(&mut index).flip();
+            }
+        }
+    }
+    */
     index.move_all_polygons(big, small);
+    big.make_mut_ref(&mut index).remove();
 
     Ok(index.scad())
 }
@@ -168,27 +250,37 @@ fn overlap_touching_edge_with_opposite_polygons(file_root: PathBuf) -> anyhow::R
 
     //let small = index.get_current_default_mesh();
     //smaller_box.polygonize(&mut index, 0)?;
-    let big = index.create_new_mesh_and_set_as_default();
-    bigger_box.polygonize(&mut index, 0)?;
-    let cut = index.create_new_mesh_and_set_as_default();
-    cutter.polygonize(&mut index, 0)?;
+    let big = index.new_mesh();
+    bigger_box.polygonize(big.make_mut_ref(&mut index), 0)?;
+    let cut = index.new_mesh();
+    cutter.polygonize(cut.make_mut_ref(&mut index), 0)?;
     for p in [
-        index.get_mesh_polygon_ids(cut).collect_vec(),
-        index.select_polygons(big, cut, PolygonFilter::Front),
+        cut.make_ref(&index).all_polygons(),
+        big.make_ref(&index).front_of(cut.make_ref(&index)),
     ]
     .into_iter()
     .flatten()
     {
-        index.remove_polygon(p)
+        p.make_mut_ref(&mut index).remove();
     }
 
-    let smal = index.create_new_mesh_and_set_as_default();
-    smaller_box.polygonize(&mut index, 0).unwrap();
+    let smal = index.new_mesh();
+    smaller_box
+        .polygonize(smal.make_mut_ref(&mut index), 0)
+        .unwrap();
 
-    //index.move_all_polygons(big, small);
+    let shared_of_big = big.make_ref(&index).shared_with(smal.make_ref(&index));
+    let shared_of_cut = smal.make_ref(&index).shared_with(big.make_ref(&index));
+    for p in shared_of_cut {
+        p.make_mut_ref(&mut index).remove();
+    }
+    for p in shared_of_big {
+        p.make_mut_ref(&mut index).remove();
+    }
 
     Ok(index.scad())
 }
+/*
 
 fn complex_cut(file_root: PathBuf) -> anyhow::Result<String> {
     let mut index = GeoIndex::new(Aabb::from_points(&[
@@ -229,11 +321,11 @@ fn complex_cut(file_root: PathBuf) -> anyhow::Result<String> {
     ]
     .concat();
 
-    for p in &remove {
-        index.remove_polygon(*p);
+    for (mesh_id, poly) in &remove {
+        index.remove_polygon(*poly, *mesh_id);
     }
 
-    for p in index.get_mesh_polygon_ids(cutter_mesh).collect_vec() {
+    for p in index.get_mesh_polygons(cutter_mesh) {
         index.flip_polygon(p);
     }
 
@@ -263,8 +355,8 @@ fn complex_cut(file_root: PathBuf) -> anyhow::Result<String> {
     ]
     .concat();
 
-    for p in select_polygons_2 {
-        index.remove_polygon(p);
+    for (mesh, poly) in select_polygons_2 {
+        index.remove_polygon(poly, mesh);
     }
     index.move_all_polygons(matter_mesh, platform_mesh);
 
@@ -490,6 +582,7 @@ fn glueing_two_meshes(file_root: PathBuf) -> anyhow::Result<String> {
 
     Ok(index.scad())
 }
+*/
 
 /*
 
@@ -1119,10 +1212,12 @@ fn main() -> Result<(), anyhow::Error> {
     fs::create_dir_all(cli.output_path.clone())?;
     let meshes = [
         /*
-        bigger_by_smaller(cli.output_path.clone())?,
+         */
+        rib_unification_1(cli.output_path.clone())?,
+        rib_unification_2(cli.output_path.clone())?,
+        cut_planes(cli.output_path.clone())?,
         overlap_in_center(cli.output_path.clone())?,
         overlap_touching_edge(cli.output_path.clone())?,
-         */
         overlap_touching_edge_with_opposite_polygons(cli.output_path.clone())?,
         /*
         complex_cut(cli.output_path.clone())?,
@@ -1143,7 +1238,7 @@ fn main() -> Result<(), anyhow::Error> {
     ];
 
     let grid: i32 = 4;
-    let grid_size = 3.0;
+    let grid_size = 5.0;
     let mut scad = Vec::new();
     'outer: for w in 0..grid {
         let x = grid_size * (w as f32 - (grid as f32 / 2.0));

@@ -258,7 +258,5 @@ fn main() -> Result<(), anyhow::Error> {
         .create(true)
         .open(cli.output_path)?;
 
-    stl_io::write_stl(&mut writer, index.into_iter())?;
-
     Ok(())
 }

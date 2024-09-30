@@ -19,6 +19,7 @@ use geometry::{
     shapes::Cylinder,
 };
 use keyboard::{
+    chok_hotswap::{self, ChokHotswap},
     Angle, Bolt, BoltPoint, Button, ButtonsCollection, ButtonsColumn, Hole, KeyboardMesh,
     RightKeyboardConfig,
 };
@@ -54,6 +55,7 @@ fn main() -> Result<(), anyhow::Error> {
     let keyboard = RightKeyboardConfig::build()
         .wall_thickness(4)
         .bottom_thickness(2)
+        /*
         .add_bolt(
             KeyboardMesh::ButtonsHull,
             KeyboardMesh::Bottom,
@@ -107,12 +109,13 @@ fn main() -> Result<(), anyhow::Error> {
                         .offset_z(2),
                 ),
         )
+        */
         .main(
             ButtonsCollection::build()
                 .column(
                     ButtonsColumn::build()
                         .main_button(
-                            Button::chok()
+                            Button::chok_hotswap_custom()
                                 .outer_left_bottom_edge(Vector3::new(
                                     Dec::one(),
                                     Dec::from(2),
@@ -121,7 +124,7 @@ fn main() -> Result<(), anyhow::Error> {
                                 .build(),
                         )
                         .main_button(
-                            Button::chok()
+                            Button::chok_hotswap_custom()
                                 .outer_right_top_edge(Vector3::new(
                                     Dec::one(),
                                     Dec::from(10),
@@ -141,7 +144,7 @@ fn main() -> Result<(), anyhow::Error> {
                 .column(
                     ButtonsColumn::build()
                         .main_button(
-                            Button::chok()
+                            Button::chok_hotswap_custom()
                                 .outer_left_top_edge(Vector3::new(
                                     Dec::from(2),
                                     Dec::from(2),
@@ -165,7 +168,7 @@ fn main() -> Result<(), anyhow::Error> {
                 .column(
                     ButtonsColumn::build()
                         .main_button(
-                            Button::chok()
+                            Button::chok_hotswap_custom()
                                 .outer_left_top_edge(Vector3::new(
                                     Dec::one(),
                                     Dec::from(10),
@@ -288,6 +291,7 @@ fn main() -> Result<(), anyhow::Error> {
                     ),
                 ),
         )
+        /*
         .add_main_hole(
             Hole::build()
                 .shape(
@@ -327,15 +331,36 @@ fn main() -> Result<(), anyhow::Error> {
                 )
                 .build()?,
         )
+            */
         .build();
 
+    std::fs::create_dir_all(&cli.output_path)?;
     println!("create main");
     let mut main = GeoIndex::new(Aabb::from_points(&[
-        Vector3::new(Dec::from(-50), Dec::from(-50), Dec::from(-50)),
+        Vector3::new(Dec::from(-51), Dec::from(-51), Dec::from(-51)),
         Vector3::new(Dec::from(50), Dec::from(50), Dec::from(50)),
     ]))
+    .debug_svg_path(cli.output_path.clone())
     .input_polygon_min_rib_length(dec!(0.05))
     .points_precision(dec!(0.001));
+
+    let mut chok_hotswap_top = GeoIndex::new(Aabb::from_points(&[
+        Vector3::new(Dec::from(-15), Dec::from(-15), Dec::from(-15)),
+        Vector3::new(Dec::from(15), Dec::from(15), Dec::from(16)),
+    ]))
+    .debug_svg_path(cli.output_path.clone())
+    .input_polygon_min_rib_length(dec!(0.05))
+    .points_precision(dec!(0.001));
+
+    let mut chok_hotswap_bottom = GeoIndex::new(Aabb::from_points(&[
+        Vector3::new(Dec::from(-15), Dec::from(-15), Dec::from(-10)),
+        Vector3::new(Dec::from(15), Dec::from(15), Dec::from(16)),
+    ]))
+    .debug_svg_path(cli.output_path.clone())
+    .input_polygon_min_rib_length(dec!(0.05))
+    .points_precision(dec!(0.001));
+
+    /*
     let some_basis = PolygonBasis {
         center: Vector3::new(
             dec!(-1.5543950009929657439721960749).into(),
@@ -356,38 +381,40 @@ fn main() -> Result<(), anyhow::Error> {
 
     let mut shifted_basis = some_basis.clone();
     shifted_basis.center += some_basis.x * Dec::from(5);
+    */
 
-    //main.poly_split_debug(3389, some_basis);
-    //main.poly_split_debug(3388, shifted_basis);
+    //main.face_debug(3389, some_basis);
 
-    keyboard.buttons_hull(&mut main).unwrap();
+    //main.face_debug(2295, None);
 
-    let main_button_hull_path = cli.output_path.join("main_button_hull.stl");
-
-    let mut writer = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(main_button_hull_path)?;
-
-    stl_io::write_stl(&mut writer, main.into_iter())?;
-
-    println!("create bottom");
-    let mut bottom = GeoIndex::new(Aabb::from_points(&[
+    let _bottom = GeoIndex::new(Aabb::from_points(&[
         Vector3::new(Dec::from(-50), Dec::from(-50), Dec::from(-50)),
         Vector3::new(Dec::from(50), Dec::from(50), Dec::from(50)),
     ]))
     .input_polygon_min_rib_length(dec!(0.05))
     .points_precision(dec!(0.001));
-    keyboard.bottom_pad(&mut bottom).unwrap();
-    let bottom_pad_path = cli.output_path.join("bottom_pad.stl");
-    let mut writer = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(bottom_pad_path)?;
 
-    stl_io::write_stl(&mut writer, bottom.into_iter())?;
+    keyboard.buttons_hull(&mut main).unwrap();
+    println!("create bottom");
+    //keyboard.bottom_pad(&mut bottom).unwrap();
+    let chok = ChokHotswap::new();
+    chok.top_mesh(&mut chok_hotswap_top)?;
+    chok.bottom_mesh(&mut chok_hotswap_bottom)?;
+
+    //let scad_path_all = cli.output_path.join("main_all.scad");
+    let main_all = cli.output_path.join("main.scad");
+    let chok_hw_top = cli.output_path.join("chok_hw_top.scad");
+    let chok_hw_bottom = cli.output_path.join("chok_hw_bottom.scad");
+
+    let scad = main.scad();
+    let button_hull = format!("translate(v=[0, 0, 0]) {{ {scad} }};");
+    let scad = chok_hotswap_top.scad();
+    let chok_hotswap_top = format!("translate(v=[0, 0, 0]) {{ {scad} }};");
+    let scad = chok_hotswap_bottom.scad();
+    let chok_hotswap_bottom = format!("translate(v=[0, 0, 0]) {{ {scad} }};");
+    std::fs::write(main_all, button_hull)?;
+    std::fs::write(chok_hw_top, chok_hotswap_top)?;
+    std::fs::write(chok_hw_bottom, chok_hotswap_bottom)?;
 
     Ok(())
 }

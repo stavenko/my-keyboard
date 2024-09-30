@@ -16,7 +16,10 @@ mod tests {
             hyper_path::{HyperPath, Root},
             hyper_point::HyperPointT,
         },
-        indexes::{aabb::Aabb, geo_index::index::GeoIndex},
+        indexes::{
+            aabb::Aabb,
+            geo_index::{geo_object::GeoObject, index::GeoIndex},
+        },
     };
 
     use super::dynamic_surface::DynamicSurface;
@@ -55,7 +58,9 @@ mod tests {
             Vector3::new(Dec::from(-50), Dec::from(-50), Dec::from(-50)),
             Vector3::new(Dec::from(50), Dec::from(50), Dec::from(50)),
         ]));
-        hs.polygonize(&mut ix, 10).unwrap();
+        let mesh = ix.new_mesh();
+        let mut mm = mesh.make_mut_ref(&mut ix);
+        hs.polygonize(&mut mm, 10).unwrap();
     }
 
     #[test]
@@ -115,7 +120,9 @@ mod tests {
             Vector3::new(Dec::from(-50), Dec::from(-50), Dec::from(-50)),
             Vector3::new(Dec::from(50), Dec::from(50), Dec::from(50)),
         ]));
-        hs.polygonize(&mut ix, 10).unwrap();
+        let mesh = ix.new_mesh();
+        let mut mm = mesh.make_mut_ref(&mut ix);
+        hs.polygonize(&mut mm, 10).unwrap();
     }
     #[test]
     fn join_3_2() {
@@ -186,7 +193,9 @@ mod tests {
             Vector3::new(Dec::from(-50), Dec::from(-50), Dec::from(-50)),
             Vector3::new(Dec::from(50), Dec::from(50), Dec::from(50)),
         ]));
-        hs.polygonize(&mut ix, 10).unwrap();
+        let mesh = ix.new_mesh();
+        let mut mm = mesh.make_mut_ref(&mut ix);
+        hs.polygonize(&mut mm, 10).unwrap();
     }
 
     #[test]
@@ -258,57 +267,8 @@ mod tests {
             Vector3::new(Dec::from(-50), Dec::from(-50), Dec::from(-50)),
             Vector3::new(Dec::from(50), Dec::from(50), Dec::from(50)),
         ]));
-        hs.polygonize(&mut ix, 10).unwrap();
+        let mesh = ix.new_mesh();
+        let mut mm = mesh.make_mut_ref(&mut ix);
+        hs.polygonize(&mut mm, 10).unwrap();
     }
-    /*
-
-    #[test]
-    fn join_1_2() {
-        let l1 = HyperLine::new_2(
-            HyperPointT {
-                normal: Vector3::new(f64::zero(), f64::zero(), f64::from(1)),
-                dir: Vector3::new(f64::from(1), f64::zero(), f64::zero()),
-                point: Vector3::zeros(),
-            },
-            HyperPointT {
-                normal: Vector3::new(f64::zero(), f64::zero(), f64::from(1)),
-                dir: Vector3::new(f64::from(1), f64::zero(), f64::zero()),
-                point: Vector3::x(),
-            },
-        );
-
-        let hp = HyperPath::new(l1);
-        let l2 = HyperLine::new_2(
-            HyperPointT {
-                normal: Vector3::new(f64::zero(), f64::zero(), f64::from(1)),
-                dir: Vector3::new(f64::from(1), f64::zero(), f64::zero()),
-                point: Vector3::z(),
-            },
-            HyperPointT {
-                normal: Vector3::new(f64::zero(), f64::zero(), f64::from(1)),
-                dir: Vector3::new(f64::from(1), f64::zero(), f64::zero()),
-                point: Vector3::x() + Vector3::z(),
-            },
-        );
-        let hp2 = HyperPath::new(l2);
-
-        let l3 = HyperLine::new_2(
-            HyperPointT {
-                normal: Vector3::new(f64::zero(), f64::zero(), f64::from(1)),
-                dir: Vector3::new(f64::from(1), f64::zero(), f64::zero()),
-                point: Vector3::x() + Vector3::z(),
-            },
-            HyperPointT {
-                normal: Vector3::new(f64::zero(), f64::zero(), f64::from(1)),
-                dir: Vector3::new(f64::from(1), f64::zero(), f64::zero()),
-                point: Vector3::x() * f64::from(2) + Vector3::z(),
-            },
-        );
-        let hp2 = hp2.push_back(l3);
-        let hs = HyperSurface(hp, hp2);
-        let mut ix = GeoIndex::new();
-        hs.polygonize(&mut ix, 10).unwrap();
-        assert!(false);
-    }
-    */
 }
