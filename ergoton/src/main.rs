@@ -1,5 +1,3 @@
-use std::fs::OpenOptions;
-
 use clap::Parser;
 use nalgebra::Vector3;
 use num_traits::{One, Zero};
@@ -18,11 +16,9 @@ use geometry::{
         geo_index::{face::FaceId, index::GeoIndex},
     },
     origin::Origin,
-    polygon_basis::PolygonBasis,
 };
 use keyboard::{
-    chok_hotswap::{self, ChokHotswap},
-    Angle, Button, ButtonsCollection, ButtonsColumn, RightKeyboardConfig,
+    chok_hotswap::ChokHotswap, Angle, Button, ButtonsCollection, ButtonsColumn, RightKeyboardConfig,
 };
 
 mod cli;
@@ -335,6 +331,7 @@ fn main() -> Result<(), anyhow::Error> {
     ]))
     .input_polygon_min_rib_length(dec!(0.05))
     .points_precision(dec!(0.001));
+    /*
 
     let some_basis = PolygonBasis {
         center: Vector3::new(
@@ -356,10 +353,12 @@ fn main() -> Result<(), anyhow::Error> {
             dec!(-0.4147028070221246913099825422).into(),
         ),
     };
+    */
 
     buttons_hull.face_debug(23, Some(FaceId(23)));
 
-    /*keyboard.buttons_hull(&mut buttons_hull).unwrap();
+    keyboard.buttons_hull(&mut buttons_hull).unwrap();
+    /*
 
     let main_button_hull_scad_path = cli.output_path.join("main_button_hull.scad");
     let scad = buttons_hull.scad();
@@ -392,6 +391,7 @@ fn main() -> Result<(), anyhow::Error> {
     .points_precision(dec!(0.001));
 
     let chok = ChokHotswap::new();
+    /*
     let xy = PolygonBasis {
         center: Vector3::zeros(),
         x: Vector3::x(),
@@ -408,6 +408,7 @@ fn main() -> Result<(), anyhow::Error> {
         x: Vector3::y(),
         y: Vector3::z(),
     };
+    */
 
     //chok_hotswap_top.poly_split_debug(64, xy.clone());
     //chok_hotswap_top.poly_split_debug(67, xy.clone());
@@ -416,7 +417,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     chok_hotswap_top.face_debug(333, None);
     chok.top_mesh(&mut chok_hotswap_top)?;
-    //chok.bottom_mesh(&mut chok_hotswap_bottom)?;
+    chok.bottom_mesh(&mut chok_hotswap_bottom)?;
     chok.outer_mount(Origin::new(), &mut chok_hotswap_mount)?;
 
     let scad_path_all = cli.output_path.join("chok_hotswap_all.scad");

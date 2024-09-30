@@ -6,4 +6,3 @@ pub mod poly;
 pub mod poly_rtree;
 pub mod rib;
 pub mod seg;
-pub mod tri_iter;

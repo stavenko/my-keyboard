@@ -81,12 +81,6 @@ impl VertexIndex {
         points.sort_by_key(|node| (node.point - center).magnitude_squared());
         points.first().map(|node| PtId(node.data))
     }
-
-    pub(crate) fn set_initial_bb(&mut self, aabb: super::aabb::Aabb) {
-        if self.octree.is_empty() {
-            self.octree.set_aabb(aabb);
-        }
-    }
 }
 
 impl From<usize> for PtId {

@@ -1,7 +1,6 @@
-use crate::{indexes::aabb::Aabb, primitives_relation};
+use crate::indexes::aabb::Aabb;
 use itertools::Itertools;
 use nalgebra::Vector3;
-use num_traits::{Bounded, Zero};
 use rust_decimal_macros::dec;
 
 use crate::{decimal::Dec, primitives_relation::relation::Relation};
@@ -220,14 +219,6 @@ impl<T: Clone> Octree<T> {
         octets
     }
 
-    fn len(&self) -> usize {
-        match &self.contents {
-            OctreeContent::Empty => 0,
-            OctreeContent::Quadrants(v) => v.iter().map(|q| q.len()).sum(),
-            OctreeContent::Container(qs) => qs.len(),
-        }
-    }
-
     pub fn new_with_aabb(nodes: Vec<Node<T>>, aabb: Aabb) -> Self {
         if nodes.is_empty() {
             Octree::empty(aabb)
@@ -244,45 +235,7 @@ impl<T: Clone> Octree<T> {
         }
     }
 
-    /*
-    pub fn new_(nodes: Vec<Node<T>>) -> Self {
-        let mut min: Vector3<Dec> = Vector3::new(
-            Bounded::max_value(),
-            Bounded::max_value(),
-            Bounded::max_value(),
-        );
-        let mut max: Vector3<Dec> = Vector3::new(
-            Bounded::min_value(),
-            Bounded::min_value(),
-            Bounded::min_value(),
-        );
-        for p in nodes.iter().map(|n| n.point) {
-            min.x = Ord::min(min.x, p.x);
-            min.y = Ord::min(min.y, p.y);
-            min.z = Ord::min(min.z, p.z);
-
-            max.x = Ord::max(max.x, p.x);
-            max.y = Ord::max(max.y, p.y);
-            max.z = Ord::max(max.z, p.z);
-        }
-
-        let aabb = Aabb { min, max };
-        if nodes.is_empty() {
-            Octree::empty()
-        } else if nodes.len() <= MAX_NODES {
-            Octree::container(nodes, aabb)
-        } else {
-            let quadrants = Self::sort(&nodes, &aabb)
-                .map(|(nodes, aabb)| Box::new(Octree::new_with_aabb(nodes, aabb)));
-            Octree {
-                aabb,
-                contents: OctreeContent::Quadrants(quadrants),
-            }
-        }
-    }
-    */
-
-    pub(crate) fn set_aabb(&mut self, aabb: Aabb) {
+    pub fn set_aabb(&mut self, aabb: Aabb) {
         self.aabb = aabb
     }
 }

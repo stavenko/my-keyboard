@@ -2,10 +2,7 @@ use nalgebra::Vector3;
 use num_traits::One;
 
 use crate::{
-    decimal::Dec,
-    geometry::GeometryDyn,
-    indexes::geo_index::{index, mesh::MeshRefMut},
-    origin::Origin,
+    decimal::Dec, geometry::GeometryDyn, indexes::geo_index::mesh::MeshRefMut, origin::Origin,
 };
 
 pub struct Rect {
@@ -190,7 +187,7 @@ impl Rect {
 impl GeometryDyn for Rect {
     fn polygonize(&self, mut mesh: MeshRefMut, _complexity: usize) -> anyhow::Result<()> {
         for p in self.render() {
-            mesh.add_polygon(&p);
+            mesh.add_polygon(&p)?;
         }
 
         Ok(())

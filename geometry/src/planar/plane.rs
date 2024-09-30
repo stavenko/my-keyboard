@@ -3,10 +3,7 @@ use std::fmt;
 use nalgebra::{ComplexField, Vector3};
 use num_traits::{One, Signed, Zero};
 
-use crate::{
-    decimal::{Dec, STABILITY_ROUNDING},
-    reversable::Reversable,
-};
+use crate::decimal::{Dec, STABILITY_ROUNDING};
 
 #[derive(Clone, Eq, PartialOrd)]
 pub struct Plane {
@@ -93,17 +90,6 @@ impl Plane {
 
     pub fn point_on_plane(&self) -> Vector3<Dec> {
         self.normal * self.d
-    }
-
-    pub(crate) fn project_unit(&self, unit: Vector3<Dec>) -> Option<Vector3<Dec>> {
-        let dot = self.normal.dot(&unit);
-        let ortho = self.normal * dot;
-        let in_plane_vec = unit - ortho;
-
-        if in_plane_vec.magnitude() == Dec::zero() {
-            return None;
-        }
-        Some((unit - ortho).normalize())
     }
 
     pub(crate) fn flipped(mut self) -> Plane {

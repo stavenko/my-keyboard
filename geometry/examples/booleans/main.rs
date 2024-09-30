@@ -1,6 +1,5 @@
 use std::{
-    collections::HashSet,
-    fs::{self, OpenOptions},
+    fs::{self},
     path::PathBuf,
 };
 
@@ -10,22 +9,15 @@ use geometry::{
     geometry::GeometryDyn,
     indexes::{
         aabb::Aabb,
-        geo_index::{
-            face::FaceId,
-            geo_object::{GeoObject, UnRef},
-            index::{GeoIndex, PolygonFilter},
-            mesh::MeshId,
-            poly::{self, PolyId},
-        },
+        geo_index::{geo_object::GeoObject, index::GeoIndex},
     },
-    origin::{self, Origin},
-    polygon_basis::PolygonBasis,
-    shapes::{Cylinder, Plane, Rect},
+    origin::Origin,
+    shapes::{Plane, Rect},
 };
 
 use itertools::Itertools;
 use nalgebra::Vector3;
-use num_traits::{Inv, One};
+use num_traits::One;
 use rust_decimal_macros::dec;
 
 #[derive(Parser)]

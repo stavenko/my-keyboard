@@ -4,9 +4,9 @@ members = [
   "geometry" ,
   "keyboard", 
   "smol", 
-  "stand", 
+#  "stand", 
   "ergoton",
-  "chok-hotswap",
+#  "chok-hotswap",
 #  "mcut",
 # "mcut-sys"
 ]

@@ -1,9 +1,4 @@
-use geometry::{
-    decimal::{self, Dec},
-    geometry::GeometryDyn,
-    origin::Origin,
-    shapes::Cylinder,
-};
+use geometry::{decimal::Dec, geometry::GeometryDyn, origin::Origin, shapes::Cylinder};
 use num_traits::{One, Zero};
 use rust_decimal_macros::dec;
 
@@ -72,18 +67,12 @@ impl BoltPoint {
     ///  Space between origin point and position of nut and bolt is tighten
     fn nut_material_gap(&self) -> Dec {
         if let Some(nut) = self.bolt.nut.as_ref() {
-            println!(
-                "bolt height --nut height: {} - {}",
-                self.bolt.height,
-                nut.height()
-            );
             self.bolt.height - (nut.height() * (Dec::from(2)))
         } else {
             Dec::zero()
         }
     }
 
-    ///
     pub fn head_up_extension(mut self, head_up_extension: impl Into<Dec>) -> Self {
         self.head_up_extension = head_up_extension.into();
         self
@@ -178,7 +167,7 @@ impl BoltPoint {
         Cylinder::with_bottom_at(
             self.origin.clone().offset_z(-dec!(0.1)),
             self.head_up_extension,
-            dbg!(self.head_thread_hole_radius()),
+            self.head_thread_hole_radius(),
         )
         .top_cap(false)
         .bottom_cap(false)

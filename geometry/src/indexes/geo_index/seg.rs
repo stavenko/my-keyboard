@@ -47,6 +47,7 @@ pub struct SegRef<'i> {
     pub(super) index: &'i GeoIndex,
 }
 
+#[allow(unused)]
 pub struct SegRefMut<'i> {
     pub(super) rib_id: RibId,
     pub(super) dir: SegmentDir,

@@ -12,7 +12,7 @@ pub struct BoltBuilder {
     head_height: Option<Dec>,
 }
 
-pub struct NutBuilder {}
+//pub struct NutBuilder {}
 
 impl BoltBuilder {
     pub fn m2(self) -> Self {

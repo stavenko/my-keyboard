@@ -1,7 +1,6 @@
 use nalgebra::Vector3;
 use num_traits::{One, Zero};
 use rust_decimal_macros::dec;
-use std::fs::OpenOptions;
 
 use clap::Parser;
 
@@ -15,13 +14,11 @@ use geometry::{
     },
     indexes::{aabb::Aabb, geo_index::index::GeoIndex},
     origin::Origin,
-    polygon_basis::PolygonBasis,
     shapes::Cylinder,
 };
 use keyboard::{
-    chok_hotswap::{self, ChokHotswap},
-    Angle, Bolt, BoltPoint, Button, ButtonsCollection, ButtonsColumn, Hole, KeyboardMesh,
-    RightKeyboardConfig,
+    chok_hotswap::ChokHotswap, Angle, Bolt, BoltPoint, Button, ButtonsCollection, ButtonsColumn,
+    Hole, KeyboardMesh, RightKeyboardConfig,
 };
 
 mod cli;
@@ -55,7 +52,6 @@ fn main() -> Result<(), anyhow::Error> {
     let keyboard = RightKeyboardConfig::build()
         .wall_thickness(4)
         .bottom_thickness(2)
-        /*
         .add_bolt(
             KeyboardMesh::ButtonsHull,
             KeyboardMesh::Bottom,
@@ -109,7 +105,6 @@ fn main() -> Result<(), anyhow::Error> {
                         .offset_z(2),
                 ),
         )
-        */
         .main(
             ButtonsCollection::build()
                 .column(
@@ -291,7 +286,6 @@ fn main() -> Result<(), anyhow::Error> {
                     ),
                 ),
         )
-        /*
         .add_main_hole(
             Hole::build()
                 .shape(
@@ -331,7 +325,6 @@ fn main() -> Result<(), anyhow::Error> {
                 )
                 .build()?,
         )
-            */
         .build();
 
     std::fs::create_dir_all(&cli.output_path)?;

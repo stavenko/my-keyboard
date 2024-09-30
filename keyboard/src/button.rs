@@ -1,10 +1,6 @@
 use geometry::{
     decimal::Dec,
-    indexes::geo_index::{
-        geo_object::GeoObject,
-        index::GeoIndex,
-        mesh::{MeshId, MeshRefMut},
-    },
+    indexes::geo_index::{geo_object::GeoObject, index::GeoIndex, mesh::MeshId},
     origin::Origin,
 };
 use nalgebra::Vector3;

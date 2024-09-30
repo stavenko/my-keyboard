@@ -1,17 +1,11 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt,
-};
+use std::fmt;
 
 use itertools::Itertools;
 use nalgebra::{Vector2, Vector3};
 use num_traits::{Bounded, Zero};
 use rand::Rng;
 
-use crate::{
-    decimal::Dec, indexes::aabb::Aabb, linear::segment2d::Segment2D, planar::plane::Plane,
-    polygon_basis::PolygonBasis,
-};
+use crate::{decimal::Dec, indexes::aabb::Aabb, planar::plane::Plane, polygon_basis::PolygonBasis};
 
 use super::{
     face::{Face, FaceId},
@@ -263,32 +257,11 @@ impl<'a> PolyRef<'a> {
     }
     */
 
-    pub(crate) fn segments_2d_iter<'s>(
-        &'s self,
-        basis: &'s PolygonBasis,
-    ) -> impl Iterator<Item = Segment2D> + 's
-    where
-        's: 'a,
-    {
-        self.segments().map(|s| Segment2D {
-            from: basis.project_on_plane_z(&s.from()),
-            to: basis.project_on_plane_z(&s.to()),
-        })
-    }
-
-    pub(crate) fn get_vertex(&self, v: crate::indexes::vertex_index::PtId) -> Vector3<Dec> {
-        self.index.vertices.get_point(v)
-    }
-
     pub(crate) fn plane(&self) -> Plane {
         match self.dir() {
             SegmentDir::Fow => self.polygon().face().plane().to_owned(),
             SegmentDir::Rev => self.polygon().face().plane().to_owned().flipped(),
         }
-    }
-
-    pub(crate) fn aabb(&self) -> &Aabb {
-        self.face().aabb()
     }
 
     fn polygon(&self) -> PolyRef {
@@ -312,14 +285,6 @@ impl<'a> PolyRef<'a> {
 
     pub fn face_id(&self) -> FaceId {
         self.index.meshes[&self.mesh_id].polies[&self.poly_id].face_id
-    }
-
-    pub(crate) fn make_mut(self, index: &'a mut GeoIndex) -> PolyRefMut<'a> {
-        PolyRefMut {
-            poly_id: self.poly_id,
-            mesh_id: self.mesh_id,
-            index,
-        }
     }
 
     pub fn dir(&self) -> SegmentDir {

@@ -1,4 +1,4 @@
-use crate::indexes::geo_index::{index::GeoIndex, mesh::MeshRefMut};
+use crate::indexes::geo_index::mesh::MeshRefMut;
 
 pub trait Geometry {
     fn polygonize(self, mesh: &mut MeshRefMut, complexity: usize) -> anyhow::Result<()>;

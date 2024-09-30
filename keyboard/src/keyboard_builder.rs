@@ -5,7 +5,6 @@ use geometry::{
     geometry::GeometryDyn,
     hyper_path::{hyper_path::Root, hyper_point::SuperPoint},
 };
-use itertools::Itertools;
 
 use crate::{
     bolt_point::BoltPoint,
@@ -15,6 +14,7 @@ use crate::{
 };
 
 #[derive(Default)]
+#[allow(clippy::type_complexity)]
 pub struct KeyboardBuilder {
     main: Option<ButtonsCollection>,
     thumb: Option<ButtonsCollection>,

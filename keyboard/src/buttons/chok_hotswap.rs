@@ -1,16 +1,15 @@
-use nalgebra::{ComplexField, Vector, Vector3};
-use std::{collections::HashSet, primitive};
+use nalgebra::{ComplexField, Vector3};
+use std::collections::HashSet;
 
 use geometry::{
     decimal::Dec,
     geometry::GeometryDyn,
-    hyper_path::length,
     indexes::geo_index::{
         face::FaceId,
-        geo_object::{GeoObject, UnRef},
-        index::{self, GeoIndex, PolygonFilter},
-        mesh::{self, MeshId},
-        poly::{PolyId, UnrefPoly},
+        geo_object::GeoObject,
+        index::{GeoIndex, PolygonFilter},
+        mesh::MeshId,
+        poly::UnrefPoly,
     },
     origin::Origin,
     shapes::{Align, Cylinder, Plane, Rect},
@@ -19,6 +18,7 @@ use itertools::Itertools;
 use num_traits::{One, Zero};
 use rust_decimal_macros::dec;
 
+#[allow(unused)]
 pub struct ChokHotswap {
     depth: Dec,
     pcb_thickness: Dec,
@@ -225,7 +225,6 @@ impl ChokHotswap {
         index: &mut GeoIndex,
     ) -> anyhow::Result<()> {
         let glue_mesh = index.new_mesh();
-        println!("glue: {glue_mesh:?}->{to_mesh:?}");
         glue.polygonize(glue_mesh.make_mut_ref(index), 0)?;
 
         let to_delete = self.addition_deletions(to_mesh, glue_mesh, index);
@@ -235,7 +234,6 @@ impl ChokHotswap {
                 && to_mesh == 7
                 && ([355, 356].contains(&p.make_ref(index).face_id().0))
             {
-                println!("SKIP: {:?}", p.make_ref(index).face_id())
             } else {
                 p.make_mut_ref(index).remove();
             }
@@ -247,7 +245,7 @@ impl ChokHotswap {
         Ok(())
     }
 
-    fn add_mesh_no_del(
+    fn _add_mesh_no_del(
         &self,
         glue: &dyn GeometryDyn,
         index: &mut GeoIndex,
@@ -1106,10 +1104,6 @@ impl ChokHotswap {
             1,
         )
         .polygonize(lower_plane.make_mut_ref(index), 0)?;
-        println!("{lower_plane:?}");
-        for f in lower_plane.make_ref(index).into_polygons() {
-            println!("Plane polyes: {f:?}: {:?}", f.make_ref(index).face_id());
-        }
 
         let rect_hole = index.new_mesh();
         Rect::build()
@@ -1140,12 +1134,6 @@ impl ChokHotswap {
         .concat();
 
         for r in remove {
-            println!(
-                "REMOVE SHARED: {:?} {:?} {:?}",
-                r.make_ref(index).face_id(),
-                r.make_ref(index).poly_id(),
-                r.make_ref(index).mesh_id()
-            );
             r.make_mut_ref(index).remove();
         }
         for p in rect_hole.make_ref(index).into_polygons() {
@@ -1169,11 +1157,6 @@ impl ChokHotswap {
             mount,
             index,
         )?;
-        let h = (self.outer_mount_height - self.mount_height) / 2;
-        let hh = h - self.bottom_mesh_screw_head_diameter / 2;
-
-        let one_hole_mesh = index.new_mesh();
-        println!("~~~~~~~~~~~~~~~AFTER{one_hole_mesh:?}~~~~~~~~~~~~~~~~~~~~~~~");
 
         self.add_hole(
             &Rect::build()
@@ -1196,103 +1179,6 @@ impl ChokHotswap {
             mount,
             index,
         )?;
-        //.polygonize(one_hole_mesh.make_mut_ref(index), 0)?;
-
-        /*
-        //println!("~~~~~~~~~~~~~~~END~~~~~~~~~~~~~~~~~~~~~~~");
-        self.add_material(
-            &Rect::build()
-                .origin(
-                    top.clone()
-                        .offset_x(-self.mount_width / 2)
-                        .offset_y(-self.mount_height / 2),
-                )
-                .width(5)
-                .height(h)
-                .depth(self.mount_lock_depth)
-                .align_z(Align::Pos)
-                .align_x(Align::Neg)
-                .align_y(Align::Pos)
-                .build(),
-            one_hole_mesh,
-            index,
-        )?;
-
-        self.treat_as_hole_in(one_hole_mesh, mount, index);
-        index.move_all_polygons(one_hole_mesh, mount);
-
-        /*
-        for p in mount
-            .make_ref(index)
-            .into_polygons()
-            .into_iter()
-            .sorted_by_key(|p| p.make_ref(index).face_id().0)
-        {
-            let face_id = p.make_ref(index).face_id();
-            if [2303, 2307, 2308]
-                .into_iter()
-                .flat_map(|i| index.get_face_with_root_parent(FaceId(i)))
-                .any(|f| f == face_id)
-            {
-                println!(
-                    "flip in mesh: {:?} {:?} {:?}",
-                    face_id,
-                    p.make_ref(index).poly_id(),
-                    p.make_ref(index).mesh_id()
-                );
-                p.make_mut_ref(index).flip();
-            }
-        }
-        */
-
-        // Bolt thread
-        self.add_hole(
-            &Cylinder::with_top_at(
-                top.clone()
-                    .offset_x(-self.mount_width / 2)
-                    .offset_y(-self.mount_height / 2)
-                    .offset_x(Dec::from(5) / 2)
-                    .offset_y(-hh),
-                5,
-                self.bottom_mesh_screw_thread_diameter / 2 * 9 / 10,
-            ),
-            mount,
-            index,
-        )?;
-
-        self.add_hole(
-            &Rect::build()
-                .origin(
-                    top.clone()
-                        .offset_x(self.mount_width / 2)
-                        .offset_y(self.mount_height / 2),
-                )
-                .width(5)
-                .height(h)
-                .depth(self.mount_lock_depth)
-                .align_z(Align::Pos)
-                .align_x(Align::Pos)
-                .align_y(Align::Neg)
-                .build(),
-            mount,
-            index,
-        )?;
-
-        // Bolt thread
-        self.add_hole(
-            &Cylinder::with_top_at(
-                top.clone()
-                    .offset_x(self.mount_width / 2)
-                    .offset_y(self.mount_height / 2)
-                    .offset_x(-Dec::from(5) / 2)
-                    .offset_y(hh),
-                5,
-                self.bottom_mesh_screw_thread_diameter / 2 * 9 / 10,
-            ),
-            mount,
-            index,
-        )?;
-        */
 
         Ok(mount)
     }

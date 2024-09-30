@@ -1,4 +1,4 @@
-use nalgebra::{ComplexField, Vector3};
+use nalgebra::Vector3;
 use num_traits::{Bounded, Pow, Zero};
 use rust_decimal_macros::dec;
 
@@ -117,10 +117,6 @@ impl Relation<Sphere> for Aabb {
         let center = [sphere.center.x, sphere.center.y, sphere.center.z];
         let min_b = [self.min.x, self.min.y, self.min.z];
         let max_b = [self.max.x, self.max.y, self.max.z];
-
-        for i in 0..3 {
-            //println!("c: {},    {}     {}", center[i], min_b[i], max_b[i]);
-        }
 
         let min_dist: Dec = center
             .iter()

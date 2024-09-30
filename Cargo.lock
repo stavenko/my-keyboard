@@ -205,23 +205,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd16c4719339c4530435d38e511904438d07cce7950afa3718a84ac36c10e89e"
 
 [[package]]
-name = "chok-hotswap"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "decimal",
- "geometry",
- "itertools",
- "keyboard",
- "nalgebra",
- "num-traits",
- "rust_decimal",
- "rust_decimal_macros",
- "stl_io",
-]
-
-[[package]]
 name = "clap"
 version = "4.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -861,23 +844,6 @@ name = "stable_deref_trait"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
-
-[[package]]
-name = "stand"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "decimal",
- "geometry",
- "itertools",
- "keyboard",
- "nalgebra",
- "num-traits",
- "rust_decimal",
- "rust_decimal_macros",
- "stl_io",
-]
 
 [[package]]
 name = "stl_io"

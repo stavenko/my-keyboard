@@ -153,27 +153,7 @@ impl Face {
 
 impl PartialEq for Face {
     fn eq(&self, other: &Self) -> bool {
-        let is_eq = self.ribs == other.ribs;
-        /*
-        if other.ribs.contains(&RibId(645))
-            && other.ribs.contains(&RibId(657))
-            && other.ribs.contains(&RibId(653))
-            && other.ribs.contains(&RibId(654))
-            && other.ribs.contains(&RibId(659))
-        {
-            println!("other",);
-        }
-
-        if self.ribs.contains(&RibId(645))
-            && self.ribs.contains(&RibId(657))
-            && self.ribs.contains(&RibId(653))
-        //&& self.ribs.contains(&RibId(654))
-        //&& self.ribs.contains(&RibId(659))
-        {
-            println!("self -> {is_eq}",);
-        }
-        */
-        is_eq
+        self.ribs == other.ribs
     }
 }
 
@@ -182,6 +162,7 @@ pub struct FaceRef<'a> {
     pub(super) index: &'a GeoIndex,
 }
 
+#[allow(dead_code)]
 pub struct FaceRefMut<'a> {
     pub(super) face_id: FaceId,
     pub(super) index: &'a mut GeoIndex,
@@ -237,7 +218,7 @@ impl<'a> FaceRef<'a> {
             .segments(SegmentDir::Fow)
             .map(|s| s.from_pt())
             .enumerate()
-            .chain(additional_points.into_iter().cloned().enumerate())
+            .chain(additional_points.iter().cloned().enumerate())
         {
             let v = self.index.vertices.get_point(pt);
             let v2 = basis.project_on_plane_z(&v) * Dec::from(1000);

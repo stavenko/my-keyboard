@@ -18,7 +18,7 @@ use crate::{
         length::Length,
         split_hyper_line::SplitHyperLine,
     },
-    indexes::geo_index::{index::GeoIndex, mesh::MeshRefMut},
+    indexes::geo_index::mesh::MeshRefMut,
 };
 
 use super::simple_dynamic_surface::SimpleSurface;

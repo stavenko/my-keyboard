@@ -3,10 +3,7 @@ use num_traits::Zero;
 use rust_decimal::Decimal;
 
 use crate::{
-    decimal::Dec,
-    geometry::GeometryDyn,
-    indexes::geo_index::{index, mesh::MeshRefMut},
-    origin::Origin,
+    decimal::Dec, geometry::GeometryDyn, indexes::geo_index::mesh::MeshRefMut, origin::Origin,
 };
 
 #[derive(Clone)]

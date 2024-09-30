@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    ops::Deref,
-};
+use std::{collections::HashMap, ops::Deref};
 
 use itertools::Itertools;
 use nalgebra::Vector3;
@@ -11,8 +8,7 @@ use crate::decimal::Dec;
 use super::{
     geo_object::{GeoObject, UnRef},
     index::GeoIndex,
-    poly::{Poly, PolyId, PolyRef, UnrefPoly},
-    rib::{RibId, RibRef},
+    poly::{Poly, PolyId, UnrefPoly},
 };
 
 #[derive(Debug, PartialEq, Clone, Default)]
@@ -54,13 +50,6 @@ impl<'a> Deref for MeshRef<'a> {
 }
 
 impl<'a> MeshRef<'a> {
-    pub(crate) fn get_rib_ref(&self, rib: RibId) -> RibRef<'a> {
-        RibRef {
-            index: self.geo_index,
-            rib_id: rib,
-        }
-    }
-
     pub fn into_polygons(self) -> Vec<UnrefPoly> {
         self.mesh()
             .polies

@@ -20,7 +20,6 @@ use geometry::{
         geo_object::GeoObject,
         index::{GeoIndex, PolygonFilter},
         mesh::{MeshId, MeshRefMut},
-        poly::PolyId,
     },
 };
 use itertools::Itertools;
@@ -28,8 +27,8 @@ use nalgebra::Vector3;
 use rust_decimal_macros::dec;
 
 use crate::{
-    bolt_point::BoltPoint, button_collections::ButtonsCollection, hole::Hole,
-    keyboard_builder::KeyboardBuilder, next_and_peek::NextAndPeekBlank,
+    button_collections::ButtonsCollection, keyboard_builder::KeyboardBuilder,
+    next_and_peek::NextAndPeekBlank,
 };
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
@@ -40,12 +39,14 @@ pub enum KeyboardMesh {
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
+#[allow(unused)]
 pub enum MaterialAddition {
     InnerSurface,
     OuterSurface,
     Both,
 }
 
+#[allow(clippy::type_complexity)]
 pub struct RightKeyboardConfig {
     pub(crate) main_buttons: ButtonsCollection,
     pub(crate) thumb_buttons: ButtonsCollection,
@@ -583,7 +584,7 @@ impl RightKeyboardConfig {
         Ok(plate_border)
     }
 
-    pub fn pcb_mount(&self, index: &mut GeoIndex) -> anyhow::Result<MeshId> {
+    pub fn pcb_mount(&self, _index: &mut GeoIndex) -> anyhow::Result<MeshId> {
         Err(anyhow!("not implemented"))
     }
 

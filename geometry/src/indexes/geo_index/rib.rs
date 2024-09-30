@@ -32,6 +32,7 @@ pub struct RibRef<'a> {
     pub(super) rib_id: RibId,
 }
 
+#[allow(dead_code)]
 pub struct RibRefMut<'a> {
     pub(crate) index: &'a mut GeoIndex,
     pub(super) rib_id: RibId,

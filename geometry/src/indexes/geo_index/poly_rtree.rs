@@ -3,7 +3,7 @@ use rstar::{Point, RTreeObject, AABB};
 
 use crate::{decimal::Dec, indexes::aabb::Aabb};
 
-use super::{face::FaceId, poly::PolyId};
+use super::face::FaceId;
 
 // use super::poly::PolyId;
 
@@ -39,14 +39,6 @@ impl Point for RtreePt {
     }
 }
 
-impl RTreeObject for PolyRtreeRecord {
-    type Envelope = AABB<RtreePt>;
-
-    fn envelope(&self) -> Self::Envelope {
-        self.1.into()
-    }
-}
-
 impl RTreeObject for FaceRtreeRecord {
     type Envelope = AABB<RtreePt>;
 
@@ -57,9 +49,6 @@ impl RTreeObject for FaceRtreeRecord {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct RtreePt([Dec; 3]);
-
-#[derive(Debug, PartialEq)]
-pub struct PolyRtreeRecord(pub(super) PolyId, pub(super) Aabb);
 
 #[derive(Debug, PartialEq)]
 pub struct FaceRtreeRecord(pub(super) FaceId, pub(super) Aabb);
