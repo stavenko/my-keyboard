@@ -225,6 +225,10 @@ impl<'a> SegRef<'a> {
     pub fn rib_id(&self) -> RibId {
         self.rib_id
     }
+
+    pub fn magnitude(&self) -> Dec {
+        self.rib_id.make_ref(self.index).magnitude()
+    }
 }
 
 impl Default for SegId {

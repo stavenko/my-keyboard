@@ -32,10 +32,10 @@ fn main() -> Result<(), anyhow::Error> {
                 .column(
                     ButtonsColumn::build()
                         //.main_buttons(3, ButtonMountKind::Placeholder)
-                        .main_button(Button::chok().build())
-                        .main_button(Button::placeholder().build())
+                        .main_button(Button::chok_hotswap_custom().build())
+                        .main_button(Button::chok_hotswap_custom().build())
                         .main_button(
-                            Button::placeholder()
+                            Button::chok_hotswap_custom()
                                 .outer_left_top_edge(Vector3::new(
                                     Dec::from(5),
                                     Dec::from(8),
@@ -54,10 +54,10 @@ fn main() -> Result<(), anyhow::Error> {
                 )
                 .column(
                     ButtonsColumn::build()
-                        .main_button(Button::placeholder().build())
-                        .main_button(Button::placeholder().build())
+                        .main_button(Button::chok_hotswap_custom().build())
+                        .main_button(Button::chok_hotswap_custom().build())
                         .main_button(
-                            Button::placeholder()
+                            Button::chok_hotswap_custom()
                                 .outer_left_top_edge(Vector3::new(
                                     Dec::one(),
                                     Dec::from(8),
@@ -71,11 +71,11 @@ fn main() -> Result<(), anyhow::Error> {
                 )
                 .column(
                     ButtonsColumn::build()
-                        .main_button(Button::placeholder().build())
-                        .main_button(Button::placeholder().build())
-                        .main_button(Button::placeholder().build())
+                        .main_button(Button::chok_hotswap_custom().build())
+                        .main_button(Button::chok_hotswap_custom().build())
+                        .main_button(Button::chok_hotswap_custom().build())
                         .add_on_top(
-                            Button::placeholder()
+                            Button::chok_hotswap_custom()
                                 .additional_padding(Dec::from(2))
                                 .depth(Dec::from(5))
                                 .incline(Angle::from_deg(Dec::from(-30)))
@@ -102,17 +102,17 @@ fn main() -> Result<(), anyhow::Error> {
                                 .build(),
                         )
                         .curvature(Angle::from_deg(Dec::from(10)))
-                        // .depth(Dec::from(-3))
+                        .depth(Dec::from(-3))
                         //.incline(Angle::from_deg(Dec::from(4)))
                         .padding(Dec::from(2))
                         .build(),
                 )
                 .column(
                     ButtonsColumn::build()
-                        .main_button(Button::placeholder().build())
-                        .main_button(Button::placeholder().build())
+                        .main_button(Button::chok_hotswap_custom().build())
+                        .main_button(Button::chok_hotswap_custom().build())
                         .main_button(
-                            Button::placeholder()
+                            Button::chok_hotswap_custom()
                                 .outer_left_top_edge(Vector3::new(
                                     Dec::one(),
                                     Dec::from(10),
@@ -126,16 +126,16 @@ fn main() -> Result<(), anyhow::Error> {
                 )
                 .column(
                     ButtonsColumn::build()
-                        .main_button(Button::placeholder().build())
-                        .main_button(Button::placeholder().build())
-                        .main_button(Button::placeholder().build())
+                        .main_button(Button::chok_hotswap_custom().build())
+                        .main_button(Button::chok_hotswap_custom().build())
+                        .main_button(Button::chok_hotswap_custom().build())
                         .curvature(Angle::from_deg(Dec::from(10)))
                         .incline(Angle::from_deg(Dec::from(10)))
                         .addition_column_padding(Dec::from(5))
                         .padding(Dec::from(2))
                         .build(),
                 )
-                .padding(Dec::from(20))
+                .padding(Dec::from(23))
                 .first_column_angle(Angle::from_deg(Dec::from(30)))
                 .plane_pitch(Angle::from_deg(Dec::from(-7)))
                 .height(Dec::from(30))
@@ -146,19 +146,19 @@ fn main() -> Result<(), anyhow::Error> {
             ButtonsCollection::build()
                 .column(
                     ButtonsColumn::build()
-                        .main_button(Button::placeholder().build())
+                        .main_button(Button::chok_hotswap_custom().build())
                         .build(),
                 )
                 .column(
                     ButtonsColumn::build()
-                        .main_button(Button::placeholder().build())
+                        .main_button(Button::chok_hotswap_custom().build())
                         .incline(Angle::from_deg(Dec::from(5)))
                         .build(),
                 )
                 .column(
                     ButtonsColumn::build()
                         .main_button(
-                            Button::placeholder()
+                            Button::chok_hotswap_custom()
                                 .outer_right_bottom_edge(Vector3::new(
                                     Dec::from(10),
                                     Dec::from(8),
@@ -201,11 +201,11 @@ fn main() -> Result<(), anyhow::Error> {
                     HyperLine::new_2(
                         SuperPoint {
                             side_dir: Vector3::z() * Dec::from(20),
-                            point: Vector3::new(Dec::from(100), Dec::from(30), Dec::zero()),
+                            point: Vector3::new(Dec::from(120), Dec::from(30), Dec::zero()),
                         },
                         SuperPoint {
                             side_dir: Vector3::z() * Dec::from(20),
-                            point: Vector3::new(Dec::from(100), -Dec::from(25), Dec::zero()),
+                            point: Vector3::new(Dec::from(120), -Dec::from(25), Dec::zero()),
                         },
                     )
                     .split_by_weights(vec![
@@ -220,7 +220,7 @@ fn main() -> Result<(), anyhow::Error> {
                     // corner
                     SuperPoint {
                         side_dir: Vector3::z() * Dec::from(20),
-                        point: Vector3::new(Dec::from(100), -Dec::from(25), Dec::zero()),
+                        point: Vector3::new(Dec::from(120), -Dec::from(25), Dec::zero()),
                     },
                     SuperPoint {
                         side_dir: Vector3::z() * Dec::from(20),
@@ -288,15 +288,15 @@ fn main() -> Result<(), anyhow::Error> {
                         },
                         SuperPoint {
                             side_dir: Vector3::z() * Dec::from(10),
-                            point: Vector3::new(-Dec::from(39), Dec::from(30), Dec::zero()),
+                            point: Vector3::new(-Dec::from(39), Dec::from(60), Dec::zero()),
                         },
                         SuperPoint {
                             side_dir: Vector3::z() * Dec::from(5),
-                            point: Vector3::new(Dec::from(80), Dec::from(50), Dec::zero()),
+                            point: Vector3::new(Dec::from(80), Dec::from(80), Dec::zero()),
                         },
                         SuperPoint {
                             side_dir: Vector3::z() * Dec::from(20),
-                            point: Vector3::new(Dec::from(100), Dec::from(30), Dec::zero()),
+                            point: Vector3::new(Dec::from(120), Dec::from(30), Dec::zero()),
                         },
                     )
                     .split_by_weights(
@@ -326,8 +326,8 @@ fn main() -> Result<(), anyhow::Error> {
         .build();
 
     let mut buttons_hull = GeoIndex::new(Aabb::from_points(&[
-        Vector3::new(Dec::from(-100), Dec::from(-100), Dec::from(-100)),
-        Vector3::new(Dec::from(105), Dec::from(100), Dec::from(100)),
+        Vector3::new(Dec::from(-150), Dec::from(-150), Dec::from(-150)),
+        Vector3::new(Dec::from(150), Dec::from(150), Dec::from(150)),
     ]))
     .input_polygon_min_rib_length(dec!(0.05))
     .points_precision(dec!(0.001));
@@ -358,13 +358,11 @@ fn main() -> Result<(), anyhow::Error> {
     buttons_hull.face_debug(23, Some(FaceId(23)));
 
     keyboard.buttons_hull(&mut buttons_hull).unwrap();
-    /*
 
     let main_button_hull_scad_path = cli.output_path.join("main_button_hull.scad");
     let scad = buttons_hull.scad();
 
     std::fs::write(main_button_hull_scad_path, scad)?;
-    */
 
     let mut chok_hotswap_top = GeoIndex::new(Aabb::from_points(&[
         Vector3::new(Dec::from(-15), Dec::from(-15), Dec::from(-15)),

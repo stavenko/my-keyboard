@@ -17,8 +17,8 @@ use super::{
 
 #[derive(PartialEq, Eq, Clone, Debug, Hash, Copy)]
 pub struct UnrefPoly {
-    pub(super) mesh_id: MeshId,
-    pub(super) poly_id: PolyId,
+    pub mesh_id: MeshId,
+    pub poly_id: PolyId,
 }
 
 impl<'a> PolyRef<'a> {
@@ -373,6 +373,9 @@ impl<'a> PolyRefMut<'a> {
     }
     pub(crate) fn replace(&mut self, replacement: Vec<Poly>) {
         let poly_ix = self.poly_id;
+        if self.mesh_id == 6 && (poly_ix == 35) {
+            println!("replace poly 35 with {replacement:?}");
+        }
         if let Some(mesh) = self.index.meshes.get_mut(&self.mesh_id) {
             mesh.polies.remove(&poly_ix);
             for p in replacement {

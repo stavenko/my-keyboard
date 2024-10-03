@@ -12,13 +12,16 @@ use geometry::{
         hyper_point::SuperPoint,
         split_hyper_line::SplitHyperLine,
     },
-    indexes::{aabb::Aabb, geo_index::index::GeoIndex},
+    indexes::{
+        aabb::Aabb,
+        geo_index::{face::FaceId, index::GeoIndex},
+    },
     origin::Origin,
     shapes::Cylinder,
 };
 use keyboard::{
-    chok_hotswap::ChokHotswap, Angle, Bolt, BoltPoint, Button, ButtonsCollection, ButtonsColumn,
-    Hole, KeyboardMesh, RightKeyboardConfig,
+    Angle, Bolt, BoltPoint, Button, ButtonsCollection, ButtonsColumn, Hole, KeyboardMesh,
+    RightKeyboardConfig,
 };
 
 mod cli;
@@ -81,10 +84,10 @@ fn main() -> Result<(), anyhow::Error> {
                 .head_thread_material_gap(4)
                 .origin(
                     Origin::new()
-                        .offset_x(16)
-                        .offset_y(-dec!(12.5))
+                        .offset_x(17)
+                        .offset_y(-dec!(11.5))
                         .offset_z(dec!(0.4))
-                        .rotate_axisangle(Vector3::x() * Angle::from_deg(10).rad())
+                        .rotate_axisangle(Vector3::x() * Angle::from_deg(20).rad())
                         .offset_z(dec!(2.5)),
                 ),
         )
@@ -337,7 +340,7 @@ fn main() -> Result<(), anyhow::Error> {
     .input_polygon_min_rib_length(dec!(0.05))
     .points_precision(dec!(0.001));
 
-    let mut chok_hotswap_top = GeoIndex::new(Aabb::from_points(&[
+    let chok_hotswap_top = GeoIndex::new(Aabb::from_points(&[
         Vector3::new(Dec::from(-15), Dec::from(-15), Dec::from(-15)),
         Vector3::new(Dec::from(15), Dec::from(15), Dec::from(16)),
     ]))
@@ -345,7 +348,7 @@ fn main() -> Result<(), anyhow::Error> {
     .input_polygon_min_rib_length(dec!(0.05))
     .points_precision(dec!(0.001));
 
-    let mut chok_hotswap_bottom = GeoIndex::new(Aabb::from_points(&[
+    let chok_hotswap_bottom = GeoIndex::new(Aabb::from_points(&[
         Vector3::new(Dec::from(-15), Dec::from(-15), Dec::from(-10)),
         Vector3::new(Dec::from(15), Dec::from(15), Dec::from(16)),
     ]))
@@ -378,7 +381,9 @@ fn main() -> Result<(), anyhow::Error> {
 
     //main.face_debug(3389, some_basis);
 
-    //main.face_debug(2295, None);
+    main.face_debug(2482, None);
+    main.face_debug(2493, Some(FaceId(2482)));
+    main.face_debug(2494, Some(FaceId(2482)));
 
     let _bottom = GeoIndex::new(Aabb::from_points(&[
         Vector3::new(Dec::from(-50), Dec::from(-50), Dec::from(-50)),
@@ -388,11 +393,11 @@ fn main() -> Result<(), anyhow::Error> {
     .points_precision(dec!(0.001));
 
     keyboard.buttons_hull(&mut main).unwrap();
-    println!("create bottom");
+    //println!("create bottom");
     //keyboard.bottom_pad(&mut bottom).unwrap();
-    let chok = ChokHotswap::new();
-    chok.top_mesh(&mut chok_hotswap_top)?;
-    chok.bottom_mesh(&mut chok_hotswap_bottom)?;
+    //let chok = ChokHotswap::new();
+    //chok.top_mesh(&mut chok_hotswap_top)?;
+    //chok.bottom_mesh(&mut chok_hotswap_bottom)?;
 
     //let scad_path_all = cli.output_path.join("main_all.scad");
     let main_all = cli.output_path.join("main.scad");

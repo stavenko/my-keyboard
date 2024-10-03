@@ -1,11 +1,9 @@
 use nalgebra::{ComplexField, Vector3};
-use std::collections::HashSet;
 
 use geometry::{
     decimal::Dec,
     geometry::GeometryDyn,
     indexes::geo_index::{
-        face::FaceId,
         geo_object::GeoObject,
         index::{GeoIndex, PolygonFilter},
         mesh::MeshId,
@@ -263,23 +261,11 @@ impl ChokHotswap {
         index: &mut GeoIndex,
     ) -> anyhow::Result<()> {
         let hole_mesh = index.new_mesh();
-        println!("hole mesh: {hole_mesh:?} < {in_mesh:?}");
         hole.polygonize(hole_mesh.make_mut_ref(index), 0)?;
 
         let to_delete = self.holes_deletions(in_mesh, hole_mesh, index);
 
         for p in to_delete {
-            /*
-            if hole_mesh == 13 {
-                let face_id = p.make_ref(index).face_id();
-                println!(
-                    "to-delete: {:?} {:?} {:?}",
-                    face_id,
-                    p.make_ref(index).poly_id(),
-                    p.make_ref(index).mesh_id()
-                );
-            }
-            */
             p.make_mut_ref(index).remove();
         }
 
@@ -540,19 +526,6 @@ impl ChokHotswap {
             index,
         )?;
 
-        /*
-        let mut holes: Vec<Box<dyn GeometryDyn>> = Vec::new();
-        holes.push(Box::new(main_hole));
-        holes.push(Box::new(left));
-
-
-        self.apply_holes(
-            &holes.iter().map(|b| b.as_ref()).collect_vec(),
-            hotswap_bottom,
-            index,
-        )?;
-        */
-
         let first_bolt_center = zero
             .clone()
             .offset_x(self.screw_coords_1()[0])
@@ -583,82 +556,7 @@ impl ChokHotswap {
 
         let hw_hole = self.hotswap_hole(index)?;
 
-        let hw_hole_polies = hw_hole
-            .make_ref(index)
-            .into_polygons()
-            .into_iter()
-            .sorted_by_key(|p| p.make_ref(index).face_id().0)
-            .collect_vec();
-
-        for p in [352]
-            .into_iter()
-            .map(FaceId)
-            .flat_map(|f| index.get_face_with_root_parent(f))
-            .flat_map(|f| {
-                hw_hole_polies
-                    .iter()
-                    .copied()
-                    .filter(|p| p.make_ref(index).face_id() == f)
-                    .collect_vec()
-            })
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .sorted_by_key(|f| f.make_ref(index).face_id().0)
-        {
-            println!(
-                "SELECTED IN HOLE: {:?}[{:?}] ({:?})",
-                p.make_ref(index).face_id(),
-                p.make_ref(index).poly_id(),
-                p.make_ref(index).mesh_id(),
-            );
-            // p.make_mut_ref(index).flip();
-        }
-
         self.treat_as_hole_in(hw_hole, hotswap_bottom, index);
-
-        let result_polies = hotswap_bottom
-            .make_ref(index)
-            .into_polygons()
-            .into_iter()
-            .sorted_by_key(|p| p.make_ref(index).face_id().0)
-            .collect_vec();
-
-        for p in [352, 355 /*, 356 */]
-            .into_iter()
-            .map(FaceId)
-            .flat_map(|f| index.get_face_with_root_parent(f))
-            .flat_map(|f| {
-                result_polies
-                    .iter()
-                    .copied()
-                    .filter(|p| p.make_ref(index).face_id() == f)
-                    .collect_vec()
-            })
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .sorted_by_key(|f| f.make_ref(index).face_id().0)
-        {
-            println!(
-                "SELECTED: {:?}[{:?}] ({:?})",
-                p.make_ref(index).face_id(),
-                p.make_ref(index).poly_id(),
-                p.make_ref(index).mesh_id(),
-            );
-            //p.make_mut_ref(index).flip();
-            for s in p.make_ref(index).segments() {
-                println!("F: {:?}-> {:?} [{:?}]", s.from_pt(), s.to_pt(), s.rib_id())
-            }
-
-            if p.make_ref(index).face_id().0 == 352 {
-                //p.make_mut_ref(index).remove();
-                println!(
-                    "REMOVED: {:?}[{:?}] ({:?})",
-                    p.make_ref(index).face_id(),
-                    p.make_ref(index).poly_id(),
-                    p.make_ref(index).mesh_id(),
-                );
-            }
-        }
 
         Ok(())
     }
@@ -667,27 +565,10 @@ impl ChokHotswap {
         let del = self.holes_deletions(in_mesh, hole_mesh, index);
 
         for p in del {
-            let face_id = p.make_ref(index).face_id();
-            println!(
-                "TREAT AS HOLE REMOVE: {:?} {:?} {:?}",
-                face_id,
-                p.make_ref(index).poly_id(),
-                p.make_ref(index).mesh_id()
-            );
-
-            if ![/*2304,2306,2309,2300, 2299,*/ 2303, 2295].contains(&face_id.0) {
-                p.make_mut_ref(index).remove();
-            }
+            p.make_mut_ref(index).remove();
         }
 
         for p in hole_mesh.make_ref(index).into_polygons() {
-            let face_id = p.make_ref(index).face_id();
-            println!(
-                "TREAT AS HOLE FLIP: {:?} {:?} {:?}",
-                face_id,
-                p.make_ref(index).poly_id(),
-                p.make_ref(index).mesh_id()
-            );
             p.make_mut_ref(index).flip();
         }
         index.move_all_polygons(hole_mesh, in_mesh);

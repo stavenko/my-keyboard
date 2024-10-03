@@ -405,10 +405,8 @@ impl Button {
 
             ButtonMountKind::ChokHotswapCustom => {
                 let mount = ChokHotswap::new();
-                println!("!!!");
 
                 mount.outer_mount(self.origin.clone(), index)
-                //Ok(index.new_mesh())
             }
             _ => todo!("Implement mesh for chok and cherry"),
         }

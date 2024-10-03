@@ -6,6 +6,7 @@ use nalgebra::Vector3;
 use crate::decimal::Dec;
 
 use super::{
+    face::FaceId,
     geo_object::{GeoObject, UnRef},
     index::GeoIndex,
     poly::{Poly, PolyId, UnrefPoly},
@@ -20,6 +21,9 @@ pub struct Mesh {
 impl Mesh {
     pub(crate) fn add(&mut self, poly: Poly) -> PolyId {
         let poly_id = PolyId(self.poly_counter);
+        if poly.face_id.0 == 2493 || poly.face_id.0 == 2494 {
+            println!("  ...{poly_id:?} ");
+        }
         self.poly_counter += 1;
         self.polies.insert(poly_id, poly);
         poly_id
@@ -101,6 +105,13 @@ impl<'a> MeshRef<'a> {
 
     fn mesh(&self) -> &Mesh {
         &self.geo_index.meshes[&self.mesh_id]
+    }
+
+    pub(crate) fn face_poly_map(&self) -> HashMap<FaceId, UnrefPoly> {
+        self.all_polygons()
+            .into_iter()
+            .map(|p| (p.make_ref(self.geo_index).face_id(), p))
+            .collect()
     }
 }
 

@@ -32,6 +32,18 @@ pub struct RibRef<'a> {
     pub(super) rib_id: RibId,
 }
 
+impl fmt::Display for RibRef<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{:?} {:?} -> {:?}",
+            self.rib_id,
+            self.from_pt(),
+            self.to_pt(),
+        )
+    }
+}
+
 #[allow(dead_code)]
 pub struct RibRefMut<'a> {
     pub(crate) index: &'a mut GeoIndex,
@@ -71,6 +83,10 @@ impl<'a> RibRef<'a> {
 
     pub(crate) fn to_pt(&self) -> PtId {
         self.index.ribs[&self.rib_id].1
+    }
+
+    pub(crate) fn magnitude(&self) -> Dec {
+        (self.from() - self.to()).magnitude()
     }
 }
 

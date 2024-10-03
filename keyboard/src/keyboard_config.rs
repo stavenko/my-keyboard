@@ -606,11 +606,10 @@ impl RightKeyboardConfig {
                 }
             })
             .filter_map(|(addition, material)| {
-                let material_mesh = index.new_mesh();
-                material
-                    .polygonize(material_mesh.make_mut_ref(index), 0)
-                    .ok()?;
                 let bolt_head_material = index.new_mesh();
+                material
+                    .polygonize(bolt_head_material.make_mut_ref(index), 0)
+                    .ok()?;
 
                 match addition {
                     MaterialAddition::InnerSurface => {
@@ -631,29 +630,31 @@ impl RightKeyboardConfig {
                             )
                             .into_iter()
                             .collect::<HashSet<_>>();
-                        let betwee_walls = bolt_head_above_inner
+
+                        let between_walls = bolt_head_above_inner
                             .intersection(&bolt_head_below_outer)
                             .copied()
                             .collect_vec();
 
+                        let inner_wall_surface_inside_material = index.select_polygons(
+                            inner_wall_surface,
+                            bolt_head_material,
+                            PolygonFilter::Back,
+                        );
+
                         let to_remove = [
-                            index.select_polygons(
-                                inner_wall_surface,
-                                bolt_head_material,
-                                PolygonFilter::Back,
-                            ),
+                            inner_wall_surface_inside_material,
                             index.select_polygons(
                                 bolt_head_material,
                                 outer_wall_surface,
                                 PolygonFilter::Front,
                             ),
-                            betwee_walls,
+                            between_walls,
                         ]
                         .concat();
 
                         for p in to_remove {
                             p.make_mut_ref(index).remove();
-                            //index.remove_polygon(p);
                         }
 
                         Some(bolt_head_material)
@@ -675,7 +676,6 @@ impl RightKeyboardConfig {
         for hole in self.holes.get(&holes).into_iter().flatten() {
             let hole_mesh = index.new_mesh();
             hole.polygonize(hole_mesh.make_mut_ref(index), 0)?;
-            println!("hole mesh: {hole_mesh:?}");
 
             let to_remove = [
                 index.select_polygons(hole_mesh, to_mesh, PolygonFilter::Front),
